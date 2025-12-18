@@ -1,0 +1,6 @@
+# WhatsApp Controller Web UI - WebSocket RPC Version
+Flask==3.0.0
+Flask-SocketIO==5.3.6
+Flask-Limiter==3.5.0
+python-socketio==5.10.0
+websockets>=12.0

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WhatsApp Controller{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+
+    <!-- QR Code Library -->
+    <script src="https://unpkg.com/qrious@4.0.2/dist/qrious.min.js"></script>
+
+    <style>
+        .status-indicator {
+            @apply inline-block w-3 h-3 rounded-full mr-2;
+        }
+        .status-connected { @apply bg-green-500; }
+        .status-disconnected { @apply bg-red-500; }
+        .status-connecting { @apply bg-yellow-500 animate-pulse; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-green-600 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-white text-xl font-bold">
+                        <a href="{{ url_for('index') }}">WhatsApp Controller</a>
+                    </h1>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Status indicator -->
+                    <div id="status-indicator" class="flex items-center text-white">
+                        <span class="status-indicator status-disconnected" id="status-dot"></span>
+                        <span id="status-text">Disconnected</span>
+                    </div>
+                    
+                    <!-- Navigation links -->
+                    <div class="flex items-center space-x-1">
+                        <a href="{{ url_for('index') }}" class="text-white hover:text-green-200 px-3 py-2 rounded text-sm">
+                            Dashboard
+                        </a>
+
+                        <!-- Messaging Dropdown -->
+                        <div class="relative group">
+                            <button class="text-white hover:text-green-200 px-3 py-2 rounded text-sm flex items-center">
+                                Messaging
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <a href="{{ url_for('send_page') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Simple Send</a>
+                                <a href="{{ url_for('messaging_page') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Enhanced Messaging</a>
+                                <a href="{{ url_for('messages_page') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Received Messages</a>
+                            </div>
+                        </div>
+
+                        <a href="{{ url_for('groups_page') }}" class="text-white hover:text-green-200 px-3 py-2 rounded text-sm">
+                            Groups
+                        </a>
+                        <a href="{{ url_for('contacts_page') }}" class="text-white hover:text-green-200 px-3 py-2 rounded text-sm">
+                            Contacts
+                        </a>
+                        <a href="{{ url_for('settings_page') }}" class="text-white hover:text-green-200 px-3 py-2 rounded text-sm">
+                            Settings
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="max-w-7xl mx-auto px-4 py-4">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' }} mb-4 p-4 rounded-lg
+                        {{ 'bg-green-100 border border-green-400 text-green-700' if category == 'success' else 'bg-red-100 border border-red-400 text-red-700' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <p class="text-center text-gray-600">
+                WhatsApp Controller - Modern Web Interface
+            </p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Status elements
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        
+        // Socket events
+        socket.on('connect', function() {
+            console.log('Connected to WebSocket');
+            socket.emit('request_status');
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from WebSocket');
+            updateStatus('disconnected', 'Disconnected');
+        });
+        
+        socket.on('status_update', function(data) {
+            console.log('Status update:', data);
+            if (data.success && data.data) {
+                const connected = data.data.connected;
+                updateStatus(connected ? 'connected' : 'disconnected', 
+                           connected ? 'Connected' : 'Disconnected');
+            }
+        });
+        
+        function updateStatus(status, text) {
+            statusDot.className = `status-indicator status-${status}`;
+            statusText.textContent = text;
+        }
+        
+        // Auto-refresh status every 30 seconds
+        setInterval(() => {
+            socket.emit('request_status');
+        }, 30000);
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

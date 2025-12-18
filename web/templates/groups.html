@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Groups - WhatsApp Controller{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">WhatsApp Groups</h2>
+            <button onclick="loadGroups()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                Refresh
+            </button>
+        </div>
+
+        <!-- Groups count -->
+        <div class="mb-4 p-3 bg-gray-100 rounded">
+            <p class="text-sm text-gray-600">
+                <span class="font-semibold">Total Groups:</span>
+                <span id="group-count">0</span>
+            </p>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loading" class="hidden text-center py-8">
+            <p class="text-gray-500">Loading groups...</p>
+        </div>
+
+        <!-- Error message -->
+        <div id="error-message" class="hidden mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        </div>
+
+        <!-- Groups container -->
+        <div id="groups-container" class="space-y-4">
+            <p class="text-gray-500 text-center py-8">Click Refresh to load groups.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Group Info Modal -->
+<div id="group-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg max-w-3xl max-h-[90vh] w-full m-4 overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b">
+            <h3 class="text-lg font-semibold" id="group-modal-title">Group Details</h3>
+            <button onclick="closeGroupModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="group-modal-content" class="p-4 overflow-auto max-h-[calc(90vh-80px)]">
+            <p class="text-gray-500">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Group Modal -->
+<div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg max-w-md w-full m-4">
+        <div class="flex justify-between items-center p-4 border-b">
+            <h3 class="text-lg font-semibold">Edit Group</h3>
+            <button onclick="closeEditModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="edit-form" class="p-4">
+            <input type="hidden" id="edit-group-id">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
+                <input type="text" id="edit-name" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea id="edit-topic" rows="3" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let groups = [];
+    const groupsContainer = document.getElementById('groups-container');
+    const groupCount = document.getElementById('group-count');
+    const loading = document.getElementById('loading');
+    const errorMessage = document.getElementById('error-message');
+
+    // Load groups on page load
+    loadGroups();
+
+    function showLoading(show) {
+        loading.classList.toggle('hidden', !show);
+    }
+
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.classList.remove('hidden');
+        setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+    }
+
+    function loadGroups() {
+        showLoading(true);
+        groupsContainer.innerHTML = '';
+
+        fetch('/api/groups')
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.success) {
+                    groups = data.data || [];
+                    renderGroups();
+                } else {
+                    showError(data.error || 'Failed to load groups');
+                    groupsContainer.innerHTML = '<p class="text-gray-500 text-center py-8">Failed to load groups.</p>';
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                console.error('Error loading groups:', error);
+                showError('Failed to load groups: ' + error.message);
+                groupsContainer.innerHTML = '<p class="text-gray-500 text-center py-8">Failed to load groups.</p>';
+            });
+    }
+
+    function renderGroups() {
+        if (groups.length === 0) {
+            groupsContainer.innerHTML = '<p class="text-gray-500 text-center py-8">No groups found.</p>';
+            groupCount.textContent = '0';
+            return;
+        }
+
+        groupCount.textContent = groups.length;
+
+        groupsContainer.innerHTML = groups.map(group => `
+            <div class="border rounded-lg p-4 hover:bg-gray-50 transition">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(group.name)}</h3>
+                        <p class="text-sm text-gray-500 mt-1">${escapeHtml(group.jid)}</p>
+                        ${group.topic ? `<p class="text-sm text-gray-600 mt-2">${escapeHtml(group.topic)}</p>` : ''}
+                        <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                            <span>${group.size} members</span>
+                            ${group.is_announce ? '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">Announcement</span>' : ''}
+                            ${group.is_locked ? '<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">Locked</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="viewGroupInfo('${group.jid}')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                            View
+                        </button>
+                        <button onclick="openEditModal('${group.jid}', '${escapeHtml(group.name)}', '${escapeHtml(group.topic || '')}')" class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">
+                            Edit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function viewGroupInfo(groupId) {
+        const modal = document.getElementById('group-modal');
+        const modalTitle = document.getElementById('group-modal-title');
+        const modalContent = document.getElementById('group-modal-content');
+
+        modal.classList.remove('hidden');
+        modalContent.innerHTML = '<p class="text-gray-500">Loading group details...</p>';
+
+        fetch(`/api/groups/${encodeURIComponent(groupId)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const info = data.data;
+                    modalTitle.textContent = info.name;
+                    modalContent.innerHTML = `
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-700">Group JID</h4>
+                                <p class="text-sm text-gray-600">${escapeHtml(info.jid)}</p>
+                            </div>
+                            ${info.topic ? `
+                            <div>
+                                <h4 class="font-semibold text-gray-700">Description</h4>
+                                <p class="text-sm text-gray-600">${escapeHtml(info.topic)}</p>
+                            </div>
+                            ` : ''}
+                            <div>
+                                <h4 class="font-semibold text-gray-700">Owner</h4>
+                                <p class="text-sm text-gray-600">${escapeHtml(info.owner)}</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700">Created</h4>
+                                <p class="text-sm text-gray-600">${new Date(info.created_at).toLocaleString()}</p>
+                            </div>
+                            <div class="flex space-x-4">
+                                ${info.is_announce ? '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm">Announcement Only</span>' : ''}
+                                ${info.is_locked ? '<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">Info Locked</span>' : ''}
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2">Participants (${info.participants.length})</h4>
+                                <div class="max-h-64 overflow-y-auto border rounded">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-100 sticky top-0">
+                                            <tr>
+                                                <th class="text-left px-3 py-2">Phone</th>
+                                                <th class="text-left px-3 py-2">Role</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${info.participants.map(p => `
+                                                <tr class="border-t">
+                                                    <td class="px-3 py-2 font-mono text-sm">${formatPhone(p.phone || p.jid)}</td>
+                                                    <td class="px-3 py-2">
+                                                        ${p.is_super_admin ? '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">Owner</span>' :
+                                                          p.is_admin ? '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Admin</span>' :
+                                                          '<span class="text-gray-500">Member</span>'}
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    modalContent.innerHTML = `<p class="text-red-500">Error: ${data.error}</p>`;
+                }
+            })
+            .catch(error => {
+                modalContent.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            });
+    }
+
+    function closeGroupModal() {
+        document.getElementById('group-modal').classList.add('hidden');
+    }
+
+    function openEditModal(groupId, name, topic) {
+        document.getElementById('edit-group-id').value = groupId;
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-topic').value = topic;
+        document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    document.getElementById('edit-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const groupId = document.getElementById('edit-group-id').value;
+        const name = document.getElementById('edit-name').value.trim();
+        const topic = document.getElementById('edit-topic').value.trim();
+
+        if (!name && !topic) {
+            showError('Please enter a name or description to update');
+            return;
+        }
+
+        const payload = { group_id: groupId };
+        if (name) payload.name = name;
+        if (topic) payload.topic = topic;
+
+        fetch('/api/groups/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeEditModal();
+                loadGroups();
+            } else {
+                showError(data.error || 'Failed to update group');
+            }
+        })
+        .catch(error => {
+            showError('Failed to update group: ' + error.message);
+        });
+    });
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatPhone(phone) {
+        if (!phone) return 'Unknown';
+        // Check if it's a LID (contains @lid or is too long to be a real phone)
+        const isLID = phone.includes('@lid') || (phone.replace(/\D/g, '').length > 13);
+        // Remove @s.whatsapp.net or @lid suffix
+        phone = phone.replace(/@s\.whatsapp\.net$/, '').replace(/@lid$/, '');
+        // Real phone numbers are 10-13 digits (with country code)
+        // LIDs are typically 15+ digits
+        if (isLID || phone.length > 13) {
+            // This is a LID - phone hidden due to WhatsApp privacy
+            return '<span class="text-gray-400" title="Phone hidden (WhatsApp Privacy)">Hidden</span>';
+        }
+        // Add + prefix for international format
+        if (/^\d+$/.test(phone) && phone.length >= 10) {
+            return '+' + phone;
+        }
+        return phone;
+    }
+
+    // Close modals on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeGroupModal();
+            closeEditModal();
+        }
+    });
+</script>
+{% endblock %}

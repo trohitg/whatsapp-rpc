@@ -1,0 +1,681 @@
+{% extends "base.html" %}
+{% block title %}Enhanced Messaging - WhatsApp Controller{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Page Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Enhanced Messaging</h1>
+        <p class="text-gray-600 mt-1">Send messages with advanced features: media, location, stickers, contact cards, replies, and more</p>
+
+        <!-- Connection Status Badge -->
+        <div id="connection-status" class="mt-3 inline-flex items-center px-4 py-2 rounded-lg">
+            <span class="mr-2">Checking connection...</span>
+        </div>
+    </div>
+
+    <!-- Enhanced Message Composer -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-6">Compose Enhanced Message</h2>
+
+        <form id="enhanced-message-form" class="space-y-6">
+            <!-- Recipient -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Send To</label>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="recipient_type" value="phone" checked class="mr-2">
+                            <span>Phone Number</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="recipient_type" value="group" class="mr-2">
+                            <span>Group</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="phone-input">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <input type="text" id="phone" placeholder="919876543210"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                </div>
+                <div id="group-input" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Group</label>
+                    <div class="flex space-x-2">
+                        <select id="group_id" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                            <option value="">-- Select a group --</option>
+                        </select>
+                        <button type="button" onclick="loadGroupsDropdown()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 whitespace-nowrap">
+                            Load Groups
+                        </button>
+                    </div>
+                    <p id="groups-status" class="text-xs text-gray-500 mt-1"></p>
+                </div>
+            </div>
+
+            <!-- Message Type -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Message Type</label>
+                <select id="message-type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    <option value="text">Text Message</option>
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="audio">Audio</option>
+                    <option value="document">Document</option>
+                    <option value="sticker">Sticker</option>
+                    <option value="location">Location</option>
+                    <option value="contact">Contact Card</option>
+                </select>
+            </div>
+
+            <!-- Text Message -->
+            <div id="text-section">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                <textarea id="message-text" placeholder="Enter your message..."
+                         rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+            </div>
+
+            <!-- Media Section -->
+            <div id="media-section" class="hidden space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Media File</label>
+                    <input type="file" id="media-file-input" accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <p class="text-sm text-gray-500 mt-1">Choose a file from your computer</p>
+                    <div id="messaging-file-preview" class="mt-2 hidden">
+                        <div class="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span id="messaging-file-name">No file selected</span>
+                            <span id="messaging-file-size" class="text-xs text-gray-500"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Caption (optional)</label>
+                    <textarea id="media-caption" placeholder="Enter caption for media..."
+                             rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                </div>
+            </div>
+
+            <!-- Location Section -->
+            <div id="location-section" class="hidden space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                        <input type="number" id="latitude" step="any" placeholder="19.0760"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                        <input type="number" id="longitude" step="any" placeholder="72.8777"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Location Name (optional)</label>
+                        <input type="text" id="location-name" placeholder="Mumbai, India"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Address (optional)</label>
+                        <input type="text" id="location-address" placeholder="Full address"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Card Section -->
+            <div id="contact-section" class="hidden space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Display Name</label>
+                    <input type="text" id="contact-display-name" placeholder="John Doe"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">vCard Data</label>
+                    <textarea id="contact-vcard" placeholder="BEGIN:VCARD&#10;VERSION:3.0&#10;FN:John Doe&#10;TEL:+1234567890&#10;EMAIL:john@example.com&#10;END:VCARD"
+                             rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 font-mono text-sm"></textarea>
+                    <p class="text-sm text-gray-500 mt-1">Enter vCard format contact information</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 class="font-semibold text-blue-900 mb-2">Quick vCard Template</h4>
+                    <button type="button" onclick="fillVCardTemplate()" class="text-sm bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        Use Template
+                    </button>
+                </div>
+            </div>
+
+            <!-- Reply Section -->
+            <div class="border-t pt-6">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="enable-reply" class="mr-2">
+                        <span class="font-medium text-gray-700">Reply to Message</span>
+                    </label>
+                </div>
+
+                <div id="reply-section" class="hidden space-y-4 bg-gray-50 p-4 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Original Message ID</label>
+                            <input type="text" id="reply-message-id" placeholder="Message ID to reply to"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Original Sender</label>
+                            <input type="text" id="reply-sender" placeholder="Sender JID"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Original Message Content</label>
+                        <textarea id="reply-content" placeholder="Content of the message being replied to"
+                                 rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-wrap gap-4 pt-6 border-t">
+                <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                    Send Enhanced Message
+                </button>
+                <button type="button" id="send-typing" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Send Typing...
+                </button>
+                <button type="button" id="clear-form" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
+                    Clear Form
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Message Status -->
+    <div id="message-status" class="hidden">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Message Status</h2>
+            <div id="status-content" class="space-y-2"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const mimeTypes = {
+    image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    video: ['video/mp4', 'video/3gpp', 'video/quicktime', 'video/avi'],
+    audio: ['audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/aac'],
+    document: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+};
+
+let messagingFileBase64 = null;
+let messagingFileName = '';
+let messagingFileMimeType = '';
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Event listeners
+    document.getElementById('enhanced-message-form').addEventListener('submit', sendEnhancedMessage);
+    document.getElementById('message-type').addEventListener('change', handleMessageTypeChange);
+    document.getElementById('enable-reply').addEventListener('change', toggleReplySection);
+    document.getElementById('clear-form').addEventListener('click', clearForm);
+    document.getElementById('send-typing').addEventListener('click', sendTypingIndicator);
+
+    // File selection handler
+    document.getElementById('media-file-input').addEventListener('change', handleFileSelection);
+
+    // Recipient type change
+    document.querySelectorAll('input[name="recipient_type"]').forEach(radio => {
+        radio.addEventListener('change', handleRecipientTypeChange);
+    });
+
+    // Initialize
+    handleMessageTypeChange();
+
+    // Check connection status on load and periodically
+    updateConnectionStatus();
+    setInterval(updateConnectionStatus, 5000); // Update every 5 seconds
+
+    // Listen for typing result
+    socket.on('typing_result', function(data) {
+        if (data.success) {
+            showStatus('Typing indicator sent', 'success');
+        } else {
+            showStatus('Failed: ' + data.error, 'error');
+        }
+    });
+});
+
+async function updateConnectionStatus() {
+    try {
+        const response = await fetch('/api/status');
+        const status = await response.json();
+
+        const statusBadge = document.getElementById('connection-status');
+
+        if (status.data && status.data.connected) {
+            statusBadge.className = 'mt-3 inline-flex items-center px-4 py-2 rounded-lg bg-green-100 border border-green-300';
+            statusBadge.innerHTML = `
+                <svg class="w-4 h-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-green-800 font-medium">WhatsApp Connected</span>
+            `;
+        } else {
+            statusBadge.className = 'mt-3 inline-flex items-center px-4 py-2 rounded-lg bg-red-100 border border-red-300';
+            statusBadge.innerHTML = `
+                <svg class="w-4 h-4 mr-2 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-red-800 font-medium">WhatsApp Not Connected - <a href="/" class="underline">Go to Dashboard</a></span>
+            `;
+        }
+    } catch (error) {
+        const statusBadge = document.getElementById('connection-status');
+        statusBadge.className = 'mt-3 inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 border border-yellow-300';
+        statusBadge.innerHTML = `
+            <svg class="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-yellow-800 font-medium">Unable to check connection status</span>
+        `;
+    }
+}
+
+function handleFileSelection(e) {
+    const file = e.target.files[0];
+    if (!file) {
+        messagingFileBase64 = null;
+        messagingFileName = '';
+        messagingFileMimeType = '';
+        document.getElementById('messaging-file-preview').classList.add('hidden');
+        return;
+    }
+
+    messagingFileName = file.name;
+    messagingFileMimeType = file.type;
+
+    // Update preview
+    document.getElementById('messaging-file-name').textContent = file.name;
+    document.getElementById('messaging-file-size').textContent = formatFileSize(file.size);
+    document.getElementById('messaging-file-preview').classList.remove('hidden');
+
+    // Read file as base64
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        messagingFileBase64 = event.target.result.split(',')[1];
+        showStatus('File loaded: ' + file.name, 'success');
+    };
+    reader.onerror = function() {
+        showStatus('Failed to read file', 'error');
+        messagingFileBase64 = null;
+    };
+    reader.readAsDataURL(file);
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function handleRecipientTypeChange() {
+    const recipientType = document.querySelector('input[name="recipient_type"]:checked').value;
+
+    if (recipientType === 'phone') {
+        document.getElementById('phone-input').classList.remove('hidden');
+        document.getElementById('group-input').classList.add('hidden');
+    } else {
+        document.getElementById('phone-input').classList.add('hidden');
+        document.getElementById('group-input').classList.remove('hidden');
+    }
+}
+
+function handleMessageTypeChange() {
+    const messageType = document.getElementById('message-type').value;
+
+    // Hide all sections
+    document.getElementById('text-section').classList.add('hidden');
+    document.getElementById('media-section').classList.add('hidden');
+    document.getElementById('location-section').classList.add('hidden');
+    document.getElementById('contact-section').classList.add('hidden');
+
+    // Show relevant section
+    if (messageType === 'text') {
+        document.getElementById('text-section').classList.remove('hidden');
+    } else if (['image', 'video', 'audio', 'document', 'sticker'].includes(messageType)) {
+        document.getElementById('media-section').classList.remove('hidden');
+
+        // Update file accept attribute based on type
+        const fileInput = document.getElementById('media-file-input');
+        if (messageType === 'sticker') {
+            fileInput.accept = 'image/webp,image/png';
+        } else if (messageType === 'image') {
+            fileInput.accept = 'image/*';
+        } else if (messageType === 'video') {
+            fileInput.accept = 'video/*';
+        } else if (messageType === 'audio') {
+            fileInput.accept = 'audio/*';
+        } else if (messageType === 'document') {
+            fileInput.accept = '.pdf,.doc,.docx,.txt,.zip';
+        }
+    } else if (messageType === 'location') {
+        document.getElementById('location-section').classList.remove('hidden');
+    } else if (messageType === 'contact') {
+        document.getElementById('contact-section').classList.remove('hidden');
+    }
+}
+
+function toggleReplySection() {
+    const enabled = document.getElementById('enable-reply').checked;
+    const section = document.getElementById('reply-section');
+
+    if (enabled) {
+        section.classList.remove('hidden');
+    } else {
+        section.classList.add('hidden');
+    }
+}
+
+async function sendEnhancedMessage(e) {
+    e.preventDefault();
+
+    // Check WhatsApp connection status first
+    try {
+        const statusResponse = await fetch('/api/status');
+        const status = await statusResponse.json();
+
+        if (!status.data || !status.data.connected) {
+            showStatus('WhatsApp is not connected. Please connect first from the dashboard.', 'error');
+            return;
+        }
+    } catch (error) {
+        showStatus('Failed to check connection status. Please try again.', 'error');
+        return;
+    }
+
+    const messageType = document.getElementById('message-type').value;
+    const recipientType = document.querySelector('input[name="recipient_type"]:checked').value;
+
+    // Build message data
+    const messageData = {
+        type: messageType
+    };
+
+    // Set recipient
+    if (recipientType === 'phone') {
+        messageData.phone = document.getElementById('phone').value.trim();
+    } else {
+        messageData.group_id = document.getElementById('group_id').value.trim();
+    }
+
+    // Add content based on type
+    if (messageType === 'text') {
+        messageData.message = document.getElementById('message-text').value.trim();
+    } else if (['image', 'video', 'audio', 'document', 'sticker'].includes(messageType)) {
+        if (!messagingFileBase64) {
+            showStatus('Please select a file first', 'error');
+            return;
+        }
+
+        const caption = document.getElementById('media-caption').value.trim();
+
+        messageData.media_data = {
+            data: messagingFileBase64,
+            mime_type: messagingFileMimeType,
+            filename: messagingFileName,
+            caption: caption
+        };
+    } else if (messageType === 'location') {
+        messageData.location = {
+            latitude: parseFloat(document.getElementById('latitude').value),
+            longitude: parseFloat(document.getElementById('longitude').value),
+            name: document.getElementById('location-name').value.trim(),
+            address: document.getElementById('location-address').value.trim()
+        };
+    } else if (messageType === 'contact') {
+        const displayName = document.getElementById('contact-display-name').value.trim();
+        const vcard = document.getElementById('contact-vcard').value.trim();
+
+        if (!displayName || !vcard) {
+            showStatus('Please enter display name and vCard data', 'error');
+            return;
+        }
+
+        messageData.contact = {
+            display_name: displayName,
+            vcard: vcard
+        };
+    }
+
+    // Add reply data if enabled
+    if (document.getElementById('enable-reply').checked) {
+        messageData.reply = {
+            message_id: document.getElementById('reply-message-id').value.trim(),
+            sender: document.getElementById('reply-sender').value.trim(),
+            content: document.getElementById('reply-content').value.trim()
+        };
+    }
+
+    try {
+        showStatus('Sending message...', 'info');
+
+        const response = await fetch('/api/send/enhanced', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(messageData)
+        });
+
+        const result = await response.json();
+
+        // Clear the "sending" message
+        document.getElementById('status-content').innerHTML = '';
+
+        // Show detailed error if available
+        if (!result.success) {
+            let errorMsg = result.error || 'Unknown error occurred';
+
+            // Provide user-friendly messages for common errors
+            if (errorMsg.includes('websocket not connected')) {
+                errorMsg = 'WhatsApp connection lost. Please check the dashboard and reconnect.';
+            } else if (errorMsg.includes('not connected')) {
+                errorMsg = 'WhatsApp is not connected. Please connect first.';
+            } else if (errorMsg.includes('invalid')) {
+                errorMsg = 'Invalid data provided: ' + errorMsg;
+            }
+
+            showMessageStatus({ success: false, error: errorMsg });
+        } else {
+            showMessageStatus(result);
+            // Clear form on success
+            clearForm();
+        }
+    } catch (error) {
+        console.error('Error sending message:', error);
+        showMessageStatus({
+            success: false,
+            error: 'Network error: Unable to reach the API server. Please check if services are running.'
+        });
+    }
+}
+
+function clearForm() {
+    document.getElementById('enhanced-message-form').reset();
+    document.getElementById('enable-reply').checked = false;
+    toggleReplySection();
+    handleMessageTypeChange();
+    handleRecipientTypeChange();
+}
+
+function showMessageStatus(result) {
+    const statusDiv = document.getElementById('message-status');
+    const content = document.getElementById('status-content');
+
+    const timestamp = new Date().toLocaleString();
+    const statusClass = result.success ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200';
+
+    const statusHtml = `
+        <div class="border rounded-lg p-4 ${statusClass}">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h3 class="font-semibold">${result.success ? 'Success' : 'Error'}</h3>
+                    <p class="text-sm mt-1">${result.success ? (result.message || 'Message sent successfully') : result.error}</p>
+                    <p class="text-xs mt-2 opacity-75">${timestamp}</p>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `;
+
+    content.insertAdjacentHTML('afterbegin', statusHtml);
+    statusDiv.classList.remove('hidden');
+
+    // Auto-remove after 10 seconds for success messages
+    if (result.success) {
+        setTimeout(() => {
+            const firstStatus = content.firstElementChild;
+            if (firstStatus) {
+                firstStatus.remove();
+                if (content.children.length === 0) {
+                    statusDiv.classList.add('hidden');
+                }
+            }
+        }, 10000);
+    }
+}
+
+function fillVCardTemplate() {
+    const template = `BEGIN:VCARD
+VERSION:3.0
+FN:John Doe
+TEL:+1234567890
+EMAIL:john@example.com
+ORG:Example Company
+TITLE:Software Engineer
+END:VCARD`;
+
+    document.getElementById('contact-display-name').value = 'John Doe';
+    document.getElementById('contact-vcard').value = template;
+    showStatus('vCard template filled. Please customize the details.', 'success');
+}
+
+async function loadGroupsDropdown() {
+    const select = document.getElementById('group_id');
+    const status = document.getElementById('groups-status');
+
+    status.textContent = 'Loading groups...';
+    status.className = 'text-xs text-blue-500 mt-1';
+
+    try {
+        const response = await fetch('/api/groups');
+        const data = await response.json();
+
+        if (data.success && data.data) {
+            const groups = data.data;
+            select.innerHTML = '<option value="">-- Select a group --</option>';
+
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.jid;
+                option.textContent = `${group.name} (${group.size} members)`;
+                select.appendChild(option);
+            });
+
+            status.textContent = `${groups.length} groups loaded`;
+            status.className = 'text-xs text-green-600 mt-1';
+        } else {
+            status.textContent = data.error || 'Failed to load groups';
+            status.className = 'text-xs text-red-500 mt-1';
+        }
+    } catch (error) {
+        status.textContent = 'Error: ' + error.message;
+        status.className = 'text-xs text-red-500 mt-1';
+    }
+}
+
+function showStatus(message, type) {
+    if (type === 'info') {
+        // Show info message differently
+        const statusDiv = document.getElementById('message-status');
+        const content = document.getElementById('status-content');
+
+        const statusHtml = `
+            <div class="border rounded-lg p-4 bg-blue-50 text-blue-800 border-blue-200">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>${message}</span>
+                </div>
+            </div>
+        `;
+
+        content.innerHTML = statusHtml;
+        statusDiv.classList.remove('hidden');
+    } else {
+        showMessageStatus({
+            success: type === 'success',
+            message: type === 'success' ? message : null,
+            error: type === 'error' ? message : null
+        });
+    }
+}
+
+function sendTypingIndicator() {
+    const recipientType = document.querySelector('input[name="recipient_type"]:checked').value;
+    let jid;
+
+    if (recipientType === 'phone') {
+        const phone = document.getElementById('phone').value.trim();
+        if (!phone) {
+            showStatus('Please enter a phone number first', 'error');
+            return;
+        }
+        jid = phone + '@s.whatsapp.net';
+    } else {
+        jid = document.getElementById('group_id').value.trim();
+        if (!jid) {
+            showStatus('Please select a group first', 'error');
+            return;
+        }
+    }
+
+    // Send typing indicator via WebSocket
+    socket.emit('typing', {
+        jid: jid,
+        state: 'composing'
+    });
+
+    showStatus('Sending typing indicator...', 'info');
+
+    // Auto-stop typing after 5 seconds
+    setTimeout(() => {
+        socket.emit('typing', {
+            jid: jid,
+            state: 'paused'
+        });
+    }, 5000);
+}
+</script>
+{% endblock %}

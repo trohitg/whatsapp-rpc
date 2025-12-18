@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - WhatsApp Controller{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Settings</h1>
+            <p class="text-gray-600">Configure rate limiting and anti-ban protection</p>
+        </div>
+        <button id="refresh-stats" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Refresh
+        </button>
+    </div>
+
+    <!-- Status Alert -->
+    <div id="status-alert" class="hidden"></div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Messages Last Minute -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-500">Messages/Min</p>
+                    <p class="text-2xl font-semibold text-gray-900"><span id="stat-messages-minute">-</span><span class="text-sm text-gray-400" id="stat-messages-minute-limit"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Last Hour -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-500">Messages/Hour</p>
+                    <p class="text-2xl font-semibold text-gray-900"><span id="stat-messages-hour">-</span><span class="text-sm text-gray-400" id="stat-messages-hour-limit"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Contacts Today -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-500">New Contacts Today</p>
+                    <p class="text-2xl font-semibold text-gray-900"><span id="stat-new-contacts">-</span><span class="text-sm text-gray-400" id="stat-new-contacts-limit"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Rate -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-500">Response Rate</p>
+                    <p class="text-2xl font-semibold text-gray-900"><span id="stat-response-rate">-</span>%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Status -->
+    <div id="pause-alert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                <span><strong>Rate Limiting Paused:</strong> <span id="pause-reason"></span></span>
+            </div>
+            <button id="unpause-btn" class="bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700">
+                Unpause
+            </button>
+        </div>
+    </div>
+
+    <!-- Configuration Section -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Rate Limiting Configuration</h2>
+            <p class="text-sm text-gray-500">Configure delays and limits to avoid WhatsApp detection and bans</p>
+        </div>
+
+        <form id="config-form" class="p-6 space-y-6">
+            <!-- Enable/Disable -->
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <h3 class="font-medium text-gray-900">Enable Rate Limiting</h3>
+                    <p class="text-sm text-gray-500">Master switch for all rate limiting features</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="config-enabled" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                </label>
+            </div>
+
+            <!-- Delays Section -->
+            <div class="border-t pt-6">
+                <h3 class="text-md font-medium text-gray-900 mb-4">Message Delays (milliseconds)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Minimum Delay</label>
+                        <input type="number" id="config-min-delay" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0" step="100">
+                        <p class="text-xs text-gray-500 mt-1">Minimum time between messages (default: 3000ms)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Maximum Delay</label>
+                        <input type="number" id="config-max-delay" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0" step="100">
+                        <p class="text-xs text-gray-500 mt-1">Maximum for randomization (default: 8000ms)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Typing Indicator Duration</label>
+                        <input type="number" id="config-typing-delay" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0" step="100">
+                        <p class="text-xs text-gray-500 mt-1">How long to show typing (default: 2000ms)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Extra Delay for Links</label>
+                        <input type="number" id="config-link-delay" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0" step="100">
+                        <p class="text-xs text-gray-500 mt-1">Additional delay for messages with URLs (default: 5000ms)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rate Limits Section -->
+            <div class="border-t pt-6">
+                <h3 class="text-md font-medium text-gray-900 mb-4">Rate Limits</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Messages per Minute</label>
+                        <input type="number" id="config-per-minute" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0">
+                        <p class="text-xs text-gray-500 mt-1">0 = unlimited (default: 10)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Messages per Hour</label>
+                        <input type="number" id="config-per-hour" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0">
+                        <p class="text-xs text-gray-500 mt-1">0 = unlimited (default: 60)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">New Contacts per Day</label>
+                        <input type="number" id="config-new-contacts" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0">
+                        <p class="text-xs text-gray-500 mt-1">Critical for new accounts (default: 20)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Human Simulation Section -->
+            <div class="border-t pt-6">
+                <h3 class="text-md font-medium text-gray-900 mb-4">Human Simulation</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <h4 class="font-medium text-gray-900">Simulate Typing</h4>
+                            <p class="text-sm text-gray-500">Send typing indicator before messages</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="config-simulate-typing" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <h4 class="font-medium text-gray-900">Randomize Delays</h4>
+                            <p class="text-sm text-gray-500">Add random variance to avoid patterns</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="config-randomize" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Safety Section -->
+            <div class="border-t pt-6">
+                <h3 class="text-md font-medium text-gray-900 mb-4">Safety Settings</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <h4 class="font-medium text-gray-900">Pause on Low Response</h4>
+                            <p class="text-sm text-gray-500">Auto-pause if response rate drops too low</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="config-pause-low-response" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Response Rate Threshold</label>
+                        <div class="flex items-center">
+                            <input type="number" id="config-response-threshold" class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" min="0" max="100" step="5">
+                            <span class="ml-2 text-gray-500">%</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Minimum acceptable response rate (default: 30%)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="border-t pt-6 flex justify-between items-center">
+                <button type="button" id="reset-defaults" class="text-gray-600 hover:text-gray-800">
+                    Reset to Defaults
+                </button>
+                <div class="flex gap-4">
+                    <button type="button" id="cancel-changes" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                        Save Configuration
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Tips Card -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="font-semibold text-blue-800 mb-3">Anti-Ban Tips</h3>
+            <ul class="text-sm text-blue-700 space-y-2">
+                <li>- First 10 days have highest ban risk for new numbers</li>
+                <li>- Keep new contacts under 20/day for new accounts</li>
+                <li>- Always enable typing simulation</li>
+                <li>- Use randomized delays to avoid patterns</li>
+                <li>- Messages with links need extra delay for preview generation</li>
+                <li>- Monitor response rate - low rates may indicate blocked messages</li>
+            </ul>
+        </div>
+
+        <!-- Current Time Info -->
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+            <h3 class="font-semibold text-gray-800 mb-3">Timing Information</h3>
+            <div class="text-sm text-gray-600 space-y-2">
+                <p><strong>Last Message:</strong> <span id="info-last-message">-</span></p>
+                <p><strong>Next Allowed:</strong> <span id="info-next-allowed">-</span></p>
+                <p><strong>Messages Today:</strong> <span id="info-messages-today">-</span></p>
+                <p><strong>Responses Received:</strong> <span id="info-responses">-</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentConfig = {};
+let currentStats = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Load initial data
+    loadRateLimitData();
+
+    // Event listeners
+    document.getElementById('refresh-stats').addEventListener('click', loadRateLimitData);
+    document.getElementById('config-form').addEventListener('submit', saveConfiguration);
+    document.getElementById('unpause-btn').addEventListener('click', unpauseRateLimiting);
+    document.getElementById('reset-defaults').addEventListener('click', resetToDefaults);
+    document.getElementById('cancel-changes').addEventListener('click', loadRateLimitData);
+
+    // Auto-refresh every 10 seconds
+    setInterval(loadStats, 10000);
+});
+
+async function loadRateLimitData() {
+    try {
+        const response = await fetch('/api/rate-limit');
+        const result = await response.json();
+
+        if (result.success) {
+            currentConfig = result.data.config;
+            currentStats = result.data.stats;
+            updateUI();
+        } else {
+            showAlert('Failed to load rate limit data: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showAlert('Error loading rate limit data: ' + error.message, 'error');
+    }
+}
+
+async function loadStats() {
+    try {
+        const response = await fetch('/api/rate-limit/stats');
+        const result = await response.json();
+
+        if (result.success) {
+            currentStats = result.data;
+            updateStats();
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+function updateUI() {
+    updateStats();
+    updateConfigForm();
+}
+
+function updateStats() {
+    // Stats cards
+    document.getElementById('stat-messages-minute').textContent = currentStats.messages_sent_last_minute || 0;
+    document.getElementById('stat-messages-minute-limit').textContent = currentConfig.max_messages_per_minute ? ` / ${currentConfig.max_messages_per_minute}` : '';
+
+    document.getElementById('stat-messages-hour').textContent = currentStats.messages_sent_last_hour || 0;
+    document.getElementById('stat-messages-hour-limit').textContent = currentConfig.max_messages_per_hour ? ` / ${currentConfig.max_messages_per_hour}` : '';
+
+    document.getElementById('stat-new-contacts').textContent = currentStats.new_contacts_today || 0;
+    document.getElementById('stat-new-contacts-limit').textContent = currentConfig.max_new_contacts_per_day ? ` / ${currentConfig.max_new_contacts_per_day}` : '';
+
+    document.getElementById('stat-response-rate').textContent = ((currentStats.response_rate || 0) * 100).toFixed(1);
+
+    // Pause status
+    const pauseAlert = document.getElementById('pause-alert');
+    if (currentStats.is_paused) {
+        pauseAlert.classList.remove('hidden');
+        document.getElementById('pause-reason').textContent = currentStats.pause_reason || 'Unknown reason';
+    } else {
+        pauseAlert.classList.add('hidden');
+    }
+
+    // Timing info
+    document.getElementById('info-last-message').textContent = currentStats.last_message_time ? formatTime(currentStats.last_message_time) : 'Never';
+    document.getElementById('info-next-allowed').textContent = currentStats.next_allowed_time ? formatTime(currentStats.next_allowed_time) : '-';
+    document.getElementById('info-messages-today').textContent = currentStats.messages_sent_today || 0;
+    document.getElementById('info-responses').textContent = currentStats.responses_received || 0;
+}
+
+function updateConfigForm() {
+    document.getElementById('config-enabled').checked = currentConfig.enabled !== false;
+    document.getElementById('config-min-delay').value = currentConfig.min_delay_ms || 3000;
+    document.getElementById('config-max-delay').value = currentConfig.max_delay_ms || 8000;
+    document.getElementById('config-typing-delay').value = currentConfig.typing_delay_ms || 2000;
+    document.getElementById('config-link-delay').value = currentConfig.link_extra_delay_ms || 5000;
+    document.getElementById('config-per-minute').value = currentConfig.max_messages_per_minute || 10;
+    document.getElementById('config-per-hour').value = currentConfig.max_messages_per_hour || 60;
+    document.getElementById('config-new-contacts').value = currentConfig.max_new_contacts_per_day || 20;
+    document.getElementById('config-simulate-typing').checked = currentConfig.simulate_typing !== false;
+    document.getElementById('config-randomize').checked = currentConfig.randomize_delays !== false;
+    document.getElementById('config-pause-low-response').checked = currentConfig.pause_on_low_response === true;
+    document.getElementById('config-response-threshold').value = (currentConfig.response_rate_threshold || 0.3) * 100;
+}
+
+async function saveConfiguration(e) {
+    e.preventDefault();
+
+    const config = {
+        enabled: document.getElementById('config-enabled').checked,
+        min_delay_ms: parseInt(document.getElementById('config-min-delay').value) || 3000,
+        max_delay_ms: parseInt(document.getElementById('config-max-delay').value) || 8000,
+        typing_delay_ms: parseInt(document.getElementById('config-typing-delay').value) || 2000,
+        link_extra_delay_ms: parseInt(document.getElementById('config-link-delay').value) || 5000,
+        max_messages_per_minute: parseInt(document.getElementById('config-per-minute').value) || 0,
+        max_messages_per_hour: parseInt(document.getElementById('config-per-hour').value) || 0,
+        max_new_contacts_per_day: parseInt(document.getElementById('config-new-contacts').value) || 0,
+        simulate_typing: document.getElementById('config-simulate-typing').checked,
+        randomize_delays: document.getElementById('config-randomize').checked,
+        pause_on_low_response: document.getElementById('config-pause-low-response').checked,
+        response_rate_threshold: (parseInt(document.getElementById('config-response-threshold').value) || 30) / 100
+    };
+
+    try {
+        const response = await fetch('/api/rate-limit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            currentConfig = result.data.config;
+            showAlert('Configuration saved successfully', 'success');
+            updateUI();
+        } else {
+            showAlert('Failed to save configuration: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showAlert('Error saving configuration: ' + error.message, 'error');
+    }
+}
+
+async function unpauseRateLimiting() {
+    try {
+        const response = await fetch('/api/rate-limit/unpause', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.success) {
+            currentStats = result.data.stats;
+            showAlert('Rate limiting unpaused', 'success');
+            updateStats();
+        } else {
+            showAlert('Failed to unpause: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showAlert('Error unpausing: ' + error.message, 'error');
+    }
+}
+
+function resetToDefaults() {
+    document.getElementById('config-enabled').checked = true;
+    document.getElementById('config-min-delay').value = 3000;
+    document.getElementById('config-max-delay').value = 8000;
+    document.getElementById('config-typing-delay').value = 2000;
+    document.getElementById('config-link-delay').value = 5000;
+    document.getElementById('config-per-minute').value = 10;
+    document.getElementById('config-per-hour').value = 60;
+    document.getElementById('config-new-contacts').value = 20;
+    document.getElementById('config-simulate-typing').checked = true;
+    document.getElementById('config-randomize').checked = true;
+    document.getElementById('config-pause-low-response').checked = false;
+    document.getElementById('config-response-threshold').value = 30;
+}
+
+function formatTime(isoString) {
+    if (!isoString || isoString === '0001-01-01T00:00:00Z') return 'Never';
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleTimeString();
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.getElementById('status-alert');
+    const bgColor = type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700';
+    alertDiv.className = `${bgColor} border px-4 py-3 rounded-lg mb-4`;
+    alertDiv.textContent = message;
+    alertDiv.classList.remove('hidden');
+
+    setTimeout(() => {
+        alertDiv.classList.add('hidden');
+    }, 5000);
+}
+</script>
+{% endblock %}

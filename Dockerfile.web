@@ -1,0 +1,17 @@
+# Python Web UI
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY web/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy web app
+COPY web/ ./
+
+# Expose port
+EXPOSE 5000
+
+# Run Flask app
+CMD ["python", "app.py"]

@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - WhatsApp Controller{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Status Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Connection Status
+        </h2>
+        
+        <div id="status-details" class="space-y-3">
+            <div class="flex justify-between items-center">
+                <span>Status:</span>
+                <span id="connection-status" class="font-medium">
+                    {{ 'Connected' if status.get('data', {}).get('connected') else 'Disconnected' }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span>Session:</span>
+                <span id="session-status" class="font-medium">
+                    {{ 'Active' if status.get('data', {}).get('has_session') else 'None' }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span>Last Check:</span>
+                <span id="last-check" class="text-sm text-gray-600">
+                    Never
+                </span>
+            </div>
+        </div>
+        
+        <div class="mt-6 space-y-3">
+            <button id="start-btn" onclick="startWhatsApp()"
+                    class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition">
+                Start WhatsApp
+            </button>
+            <button id="restart-btn" onclick="restartWhatsApp()"
+                    class="w-full bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 transition">
+                Restart
+            </button>
+        </div>
+    </div>
+
+    <!-- QR Code Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+            </svg>
+            QR Code
+        </h2>
+        
+        <div id="qr-container" class="text-center">
+            <div class="bg-gray-100 rounded-lg p-8 mb-4">
+                <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                </svg>
+                <p class="text-gray-600 mt-2">No QR code available</p>
+            </div>
+            <p class="text-sm text-gray-600">
+                Start WhatsApp service to generate QR code for pairing
+            </p>
+        </div>
+    </div>
+
+    <!-- Quick Send Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+            </svg>
+            Quick Send
+        </h2>
+        
+        <form id="quick-send-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Phone Number</label>
+                <input type="text" id="quick-phone" placeholder="1234567890" required
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Message</label>
+                <textarea id="quick-message" placeholder="Enter your message..." rows="3" required
+                          class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+            </div>
+            <button type="submit" 
+                    class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition">
+                Send Message
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Activity Feed -->
+<div class="mt-8 bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-xl font-semibold mb-4">Activity Feed</h2>
+    <div id="activity-feed" class="space-y-2">
+        <p class="text-gray-600">No recent activity</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dashboard specific JavaScript
+    let activityFeed = [];
+    
+    function startWhatsApp() {
+        const btn = document.getElementById('start-btn');
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+
+        fetch('/api/start', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addActivity('success', 'WhatsApp service started successfully');
+                    // Start loading QR code immediately
+                    setTimeout(() => loadQRCode(), 1500);
+                } else {
+                    addActivity('error', `Failed to start WhatsApp: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                addActivity('error', `Error: ${error.message}`);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Start WhatsApp';
+                setTimeout(refreshStatus, 2000);
+            });
+    }
+    
+    function refreshStatus() {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    updateStatusDisplay(data.data);
+                    addActivity('info', 'Status refreshed');
+                }
+            })
+            .catch(error => {
+                addActivity('error', `Failed to refresh status: ${error.message}`);
+            });
+    }
+    
+    function updateStatusDisplay(status) {
+        document.getElementById('connection-status').textContent = 
+            status.connected ? 'Connected' : 'Disconnected';
+        document.getElementById('session-status').textContent = 
+            status.has_session ? 'Active' : 'None';
+        document.getElementById('last-check').textContent = 
+            new Date().toLocaleTimeString();
+    }
+    
+    function addActivity(type, message) {
+        const timestamp = new Date().toLocaleTimeString();
+        activityFeed.unshift({ type, message, timestamp });
+        
+        // Keep only last 10 activities
+        if (activityFeed.length > 10) {
+            activityFeed = activityFeed.slice(0, 10);
+        }
+        
+        renderActivityFeed();
+    }
+    
+    function renderActivityFeed() {
+        const container = document.getElementById('activity-feed');
+        if (activityFeed.length === 0) {
+            container.innerHTML = '<p class="text-gray-600">No recent activity</p>';
+            return;
+        }
+        
+        container.innerHTML = activityFeed.map(activity => {
+            const colorClass = activity.type === 'success' ? 'text-green-600' :
+                              activity.type === 'error' ? 'text-red-600' : 'text-blue-600';
+            return `
+                <div class="flex justify-between items-center py-2 border-b last:border-b-0">
+                    <span class="${colorClass}">${activity.message}</span>
+                    <span class="text-sm text-gray-500">${activity.timestamp}</span>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // Quick send form
+    document.getElementById('quick-send-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const phone = document.getElementById('quick-phone').value;
+        const message = document.getElementById('quick-message').value;
+        
+        if (!phone || !message) {
+            addActivity('error', 'Phone number and message are required');
+            return;
+        }
+        
+        fetch('/api/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, message })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addActivity('success', `Message sent to ${phone}`);
+                document.getElementById('quick-message').value = '';
+            } else {
+                addActivity('error', `Failed to send message: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            addActivity('error', `Error sending message: ${error.message}`);
+        });
+    });
+    
+    function loadQRCode(maxAttempts = 10, attemptNum = 1) {
+        fetch('/api/qr')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('qr-container');
+                if (data.success && data.data && data.data.has_qr) {
+                    // Display base64 image directly (Docker compatible)
+                    const imgSrc = data.data.image_data
+                        ? `data:image/png;base64,${data.data.image_data}`
+                        : `/qr/${data.data.filename}`;
+                    container.innerHTML = `
+                        <div class="text-center">
+                            <img src="${imgSrc}" alt="QR Code" class="mx-auto mb-4 border-2 border-gray-300 rounded" style="width: 256px; height: 256px;" />
+                            <p class="text-sm text-gray-600">Scan this QR code with WhatsApp</p>
+                        </div>
+                    `;
+                    addActivity('info', 'QR code loaded');
+                } else {
+                    // QR not ready yet, poll again if we haven't exceeded max attempts
+                    if (attemptNum < maxAttempts) {
+                        container.innerHTML = `
+                            <div class="bg-gray-100 rounded-lg p-8 mb-4">
+                                <svg class="w-16 h-16 mx-auto text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                <p class="text-gray-600 mt-2">Waiting for QR code... (${attemptNum}/${maxAttempts})</p>
+                            </div>
+                        `;
+                        setTimeout(() => loadQRCode(maxAttempts, attemptNum + 1), 1000);
+                    } else {
+                        container.innerHTML = `
+                            <div class="bg-gray-100 rounded-lg p-8 mb-4">
+                                <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                                </svg>
+                                <p class="text-gray-600 mt-2">QR code not available</p>
+                            </div>
+                            <p class="text-sm text-gray-600">
+                                Try clicking "Regenerate QR Code" again
+                            </p>
+                        `;
+                        addActivity('error', 'QR code generation timed out');
+                    }
+                }
+            })
+            .catch(error => {
+                addActivity('error', `Failed to load QR code: ${error.message}`);
+            });
+    }
+
+    function restartWhatsApp() {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.textContent = 'Restarting...';
+        
+        fetch('/api/restart', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addActivity('success', 'WhatsApp service restarted successfully');
+                    // Start loading QR code immediately
+                    setTimeout(() => loadQRCode(), 1500);
+                } else {
+                    addActivity('error', `Failed to restart WhatsApp: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                addActivity('error', `Error: ${error.message}`);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Restart';
+                setTimeout(refreshStatus, 2000);
+            });
+    }
+
+    // Socket.IO events for real-time updates
+    socket.on('qr_code', function(data) {
+        loadQRCode(); // Reload QR code when event received
+        addActivity('info', 'New QR code generated');
+    });
+    
+    socket.on('connected', function(data) {
+        addActivity('success', 'WhatsApp connected successfully');
+        refreshStatus();
+    });
+    
+    socket.on('disconnected', function(data) {
+        addActivity('warning', 'WhatsApp disconnected');
+        refreshStatus();
+    });
+
+    // Initial status check only (QR code must be manually regenerated)
+    refreshStatus();
+</script>
+{% endblock %}

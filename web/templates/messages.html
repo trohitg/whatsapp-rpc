@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+
+{% block title %}Received Messages - WhatsApp Controller{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Received Messages</h2>
+            <div class="flex items-center space-x-4">
+                <button onclick="loadMessages()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                    Refresh
+                </button>
+                <button onclick="clearMessages()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition">
+                    Clear Display
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages count -->
+        <div class="mb-4 p-3 bg-gray-100 rounded">
+            <p class="text-sm text-gray-600">
+                <span class="font-semibold">Total Messages:</span>
+                <span id="message-count">0</span>
+            </p>
+        </div>
+
+        <!-- Messages container -->
+        <div id="messages-container" class="space-y-4 max-h-[600px] overflow-y-auto p-4 bg-gray-50 rounded">
+            <p class="text-gray-500 text-center py-8">No messages yet. Waiting for incoming messages...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Media Viewer Modal -->
+<div id="media-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full m-4 overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b">
+            <h3 class="text-lg font-semibold" id="media-modal-title">Media Viewer</h3>
+            <button onclick="closeMediaModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="media-modal-content" class="p-4 overflow-auto max-h-[calc(90vh-80px)] flex items-center justify-center bg-gray-100">
+            <p class="text-gray-500">Loading...</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let messages = [];
+    let groupsCache = {}; // Cache group names by JID
+    const messagesContainer = document.getElementById('messages-container');
+    const messageCount = document.getElementById('message-count');
+
+    // Load groups cache on page load
+    loadGroupsCache();
+
+    // Subscribe to messages via WebSocket
+    socket.emit('subscribe_messages');
+
+    // Load groups into cache for name lookup
+    async function loadGroupsCache() {
+        try {
+            const response = await fetch('/api/groups');
+            const data = await response.json();
+            if (data.success && data.data) {
+                data.data.forEach(group => {
+                    groupsCache[group.jid] = group.name;
+                });
+                console.log(`Cached ${Object.keys(groupsCache).length} group names`);
+            }
+        } catch (error) {
+            console.error('Failed to load groups cache:', error);
+        }
+    }
+
+    // Get group name from cache
+    function getGroupName(jid) {
+        return groupsCache[jid] || null;
+    }
+
+    // Listen for new messages via WebSocket
+    socket.on('whatsapp_event', function(data) {
+        console.log('Received WhatsApp event:', data);
+
+        if (data.type === 'message_received') {
+            // Add new message to the beginning
+            messages.unshift(data);
+            renderMessages();
+
+            // Show notification
+            showNotification('New message received from ' + formatSender(data.data.sender));
+        }
+    });
+
+    // Refresh just re-renders (messages come via WebSocket)
+    function loadMessages() {
+        renderMessages();
+        console.log('Messages display refreshed');
+    }
+
+    // Render all messages
+    function renderMessages() {
+        if (messages.length === 0) {
+            messagesContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <p class="text-gray-500 mb-2">No messages yet.</p>
+                    <p class="text-sm text-gray-400">Messages will appear here in real-time as they are received.</p>
+                    <p class="text-xs text-gray-400 mt-2">Make sure WhatsApp is connected.</p>
+                </div>
+            `;
+            messageCount.textContent = '0';
+            return;
+        }
+
+        messageCount.textContent = messages.length;
+
+        messagesContainer.innerHTML = messages.map(msg => {
+            const data = msg.data || {};
+            return createMessageCard(data);
+        }).join('');
+    }
+
+    // Create message card HTML
+    function createMessageCard(data) {
+        const messageType = data.message_type || 'unknown';
+        const timestamp = formatTimestamp(data.timestamp);
+        const sender = formatSender(data.sender);
+        const isFromMe = data.is_from_me;
+        const isGroup = data.is_group || false;
+        const chatId = data.chat_id || '';
+
+        // Get group name if it's a group message
+        let groupName = null;
+        if (isGroup && chatId) {
+            groupName = getGroupName(chatId);
+        }
+
+        let contentHtml = '';
+        let typeIcon = '';
+        let typeColor = 'bg-blue-100 text-blue-800';
+
+        // Render based on message type
+        switch(messageType) {
+            case 'text':
+                typeIcon = '&#128172;'; // Speech bubble
+                contentHtml = `<p class="text-gray-800">${escapeHtml(data.text || '')}</p>`;
+                break;
+
+            case 'image':
+                typeIcon = '&#128247;'; // Camera
+                typeColor = 'bg-purple-100 text-purple-800';
+                const imageInfo = data.image || {};
+                contentHtml = `
+                    <div class="flex items-center space-x-3 mb-2">
+                        <svg class="w-16 h-16 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-600">Image message</p>
+                            <p class="text-xs text-gray-500">${imageInfo.mime_type || 'image'} - ${formatFileSize(imageInfo.file_length || 0)}</p>
+                            ${data.caption ? `<p class="text-gray-800 italic mt-1">${escapeHtml(data.caption)}</p>` : ''}
+                        </div>
+                    </div>
+                    ${imageInfo.url ? `<button onclick="viewMedia('${escapeHtml(data.message_id)}', 'image', '${escapeHtml(imageInfo.url)}')" class="mt-2 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm">View Image</button>` : ''}
+                `;
+                break;
+
+            case 'video':
+                typeIcon = '&#127909;'; // Video camera
+                typeColor = 'bg-pink-100 text-pink-800';
+                const videoInfo = data.video || {};
+                contentHtml = `
+                    <div class="flex items-center space-x-3 mb-2">
+                        <svg class="w-16 h-16 text-pink-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-600">Video message</p>
+                            <p class="text-xs text-gray-500">${videoInfo.mime_type || 'video'} - ${formatFileSize(videoInfo.file_length || 0)} - ${videoInfo.seconds || 0}s</p>
+                            ${data.caption ? `<p class="text-gray-800 italic mt-1">${escapeHtml(data.caption)}</p>` : ''}
+                        </div>
+                    </div>
+                    ${videoInfo.url ? `<button onclick="viewMedia('${escapeHtml(data.message_id)}', 'video', '${escapeHtml(videoInfo.url)}')" class="mt-2 px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 text-sm">View Video</button>` : ''}
+                `;
+                break;
+
+            case 'audio':
+                typeIcon = '&#127925;'; // Musical note
+                typeColor = 'bg-green-100 text-green-800';
+                contentHtml = `<p class="text-sm text-gray-600">Audio message</p>`;
+                break;
+
+            case 'document':
+                typeIcon = '&#128196;'; // Document
+                typeColor = 'bg-yellow-100 text-yellow-800';
+                contentHtml = `
+                    <p class="text-sm text-gray-600 mb-2">Document</p>
+                    ${data.file_name ? `<p class="text-gray-700 font-mono text-xs">${escapeHtml(data.file_name)}</p>` : ''}
+                `;
+                break;
+
+            case 'sticker':
+                typeIcon = '&#128526;'; // Sticker emoji
+                typeColor = 'bg-orange-100 text-orange-800';
+                contentHtml = `<p class="text-sm text-gray-600">Sticker</p>`;
+                break;
+
+            case 'location':
+                typeIcon = '&#128205;'; // Pin
+                typeColor = 'bg-red-100 text-red-800';
+                contentHtml = `
+                    <p class="text-sm text-gray-600 mb-2">Location</p>
+                    ${data.location ? `
+                        <p class="text-gray-800">
+                            <span class="font-semibold">${escapeHtml(data.location.name || 'Unknown')}</span><br>
+                            <span class="text-sm text-gray-600">${escapeHtml(data.location.address || '')}</span><br>
+                            <span class="text-xs text-gray-500">Lat: ${data.location.latitude}, Lon: ${data.location.longitude}</span>
+                        </p>
+                    ` : ''}
+                `;
+                break;
+
+            case 'contact':
+                typeIcon = '&#128100;'; // Contact
+                typeColor = 'bg-indigo-100 text-indigo-800';
+                contentHtml = `
+                    <p class="text-sm text-gray-600 mb-2">Contact Card</p>
+                    ${data.contact ? `
+                        <p class="text-gray-800 font-semibold">${escapeHtml(data.contact.display_name || 'Unknown')}</p>
+                    ` : ''}
+                `;
+                break;
+
+            case 'contacts':
+                typeIcon = '&#128101;'; // Contacts
+                typeColor = 'bg-teal-100 text-teal-800';
+                contentHtml = `<p class="text-sm text-gray-600">Multiple contacts (${data.contacts_count || 0})</p>`;
+                break;
+
+            default:
+                typeIcon = '&#10067;'; // Question mark
+                typeColor = 'bg-gray-100 text-gray-800';
+                contentHtml = `<p class="text-sm text-gray-600">Unknown message type: ${messageType}</p>`;
+        }
+
+        // Add quoted message if exists
+        let quotedHtml = '';
+        if (data.quoted) {
+            quotedHtml = `
+                <div class="mt-2 p-2 bg-gray-100 border-l-4 border-gray-400 rounded">
+                    <p class="text-xs text-gray-600">Replying to:</p>
+                    <p class="text-sm text-gray-700 italic">${escapeHtml(data.quoted.content || '')}</p>
+                </div>
+            `;
+        }
+
+        // Build group info line
+        let groupInfoHtml = '';
+        if (isGroup) {
+            const displayGroupName = groupName || chatId.replace('@g.us', '');
+            groupInfoHtml = `<p class="text-xs text-purple-600">in <span class="font-medium">${escapeHtml(displayGroupName)}</span></p>`;
+        }
+
+        return `
+            <div class="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition ${isFromMe ? 'border-l-4 border-green-500' : isGroup ? 'border-l-4 border-purple-500' : 'border-l-4 border-blue-500'}">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl">${typeIcon}</span>
+                        <div>
+                            <p class="font-semibold text-gray-800">${sender}</p>
+                            ${groupInfoHtml}
+                            <span class="inline-block px-2 py-1 rounded text-xs font-medium ${typeColor}">${messageType}</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">${timestamp}</p>
+                        ${isFromMe ? '<span class="text-xs text-green-600 font-medium">Sent by me</span>' : ''}
+                        ${isGroup && !isFromMe ? '<span class="text-xs text-purple-600 font-medium">Group message</span>' : ''}
+                    </div>
+                </div>
+                <div class="mt-2">
+                    ${contentHtml}
+                    ${quotedHtml}
+                </div>
+                <div class="mt-2 pt-2 border-t text-xs text-gray-400 flex justify-between items-center">
+                    <span class="font-mono">ID: ${escapeHtml(data.message_id || 'N/A')}</span>
+                    ${!isFromMe ? `<button onclick="markAsRead('${escapeHtml(data.message_id)}', '${escapeHtml(chatId)}', '${escapeHtml(data.sender || '')}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">Mark Read</button>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // Format timestamp
+    function formatTimestamp(timestamp) {
+        if (!timestamp) return 'Unknown time';
+        // Handle both ISO 8601 strings and Unix timestamps
+        const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp * 1000);
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        return date.toLocaleString();
+    }
+
+    // Format sender
+    function formatSender(sender) {
+        if (!sender) return 'Unknown';
+        // Remove @s.whatsapp.net suffix
+        return sender.replace('@s.whatsapp.net', '').replace('@c.us', '');
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Clear messages display
+    function clearMessages() {
+        if (confirm('Clear all displayed messages? (This will not delete them from storage)')) {
+            messages = [];
+            renderMessages();
+        }
+    }
+
+    // Format file size
+    function formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // View media function
+    function viewMedia(messageId, mediaType, url) {
+        console.log('View media:', messageId, mediaType, url);
+
+        const modal = document.getElementById('media-modal');
+        const modalTitle = document.getElementById('media-modal-title');
+        const modalContent = document.getElementById('media-modal-content');
+
+        // Show modal
+        modal.classList.remove('hidden');
+
+        // Set title
+        modalTitle.textContent = `Viewing ${mediaType}`;
+
+        // Show loading
+        modalContent.innerHTML = '<p class="text-gray-500">Downloading and decrypting media...</p>';
+
+        // Fetch media via Flask RPC endpoint (returns JSON with base64 data)
+        fetch(`/api/media/${messageId}`)
+            .then(response => response.json())
+            .then(result => {
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to download media');
+                }
+
+                const mediaData = result.data;
+                const base64Data = mediaData.data;
+                const mimeType = mediaData.mime_type || 'application/octet-stream';
+
+                // Convert base64 to blob
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: mimeType });
+                const blobUrl = URL.createObjectURL(blob);
+
+                if (mediaType === 'image') {
+                    modalContent.innerHTML = `
+                        <img src="${blobUrl}" class="max-w-full max-h-full object-contain" alt="WhatsApp Image">
+                    `;
+                } else if (mediaType === 'video') {
+                    modalContent.innerHTML = `
+                        <video controls class="max-w-full max-h-full" autoplay>
+                            <source src="${blobUrl}" type="${mimeType}">
+                            Your browser does not support the video tag.
+                        </video>
+                    `;
+                } else if (mediaType === 'audio') {
+                    modalContent.innerHTML = `
+                        <audio controls autoplay class="w-full">
+                            <source src="${blobUrl}" type="${mimeType}">
+                            Your browser does not support the audio tag.
+                        </audio>
+                    `;
+                } else {
+                    modalContent.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-gray-600 mb-4">Media loaded successfully</p>
+                            <a href="${blobUrl}" download class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                Download ${mediaType}
+                            </a>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading media:', error);
+                modalContent.innerHTML = `
+                    <div class="text-center text-red-600">
+                        <p>Failed to load media: ${error.message}</p>
+                        <p class="text-sm text-gray-500 mt-2">The message may have expired or been deleted.</p>
+                    </div>
+                `;
+            });
+    }
+
+    // Close media modal
+    function closeMediaModal() {
+        const modal = document.getElementById('media-modal');
+        modal.classList.add('hidden');
+
+        // Clear content to stop videos/audio
+        const modalContent = document.getElementById('media-modal-content');
+        modalContent.innerHTML = '<p class="text-gray-500">Loading...</p>';
+    }
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+        // Simple console notification for now
+        console.log(`[${type.toUpperCase()}] ${message}`);
+
+        // Could add a toast notification here in the future
+    }
+
+    // Mark message as read via WebSocket
+    function markAsRead(messageId, chatJid, senderJid) {
+        console.log('Marking as read:', messageId, chatJid, senderJid);
+        socket.emit('mark_read', {
+            message_ids: [messageId],
+            chat_jid: chatJid,
+            sender_jid: senderJid || null
+        });
+    }
+
+    // Listen for mark_read result
+    socket.on('mark_read_result', function(data) {
+        if (data.success) {
+            showNotification('Message marked as read');
+        } else {
+            showNotification('Failed to mark as read: ' + data.error, 'error');
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,35 @@
+# Build artifacts
+*.exe
+whatsapp-rpc
+
+# Runtime data
+data/
+
+# Node
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Claude
+CLAUDE.md
+.claude/

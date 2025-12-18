@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Contacts - WhatsApp Controller{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Page Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Contacts</h1>
+        <p class="text-gray-600 mt-1">Check if phone numbers are on WhatsApp and view profile pictures</p>
+    </div>
+
+    <!-- Check Numbers Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Check Phone Numbers</h2>
+        <p class="text-gray-600 mb-4">Enter phone numbers (one per line) to check if they are registered on WhatsApp</p>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Phone Numbers</label>
+                <textarea id="phone-numbers" rows="5"
+                    placeholder="Enter phone numbers, one per line (without + prefix)&#10;e.g.&#10;919876543210&#10;14155551234"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+            </div>
+
+            <button onclick="checkContacts()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Check Numbers
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div id="check-results" class="mt-6 hidden">
+            <h3 class="font-semibold text-gray-800 mb-3">Results</h3>
+            <div id="results-container" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- Profile Picture Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Profile Picture</h2>
+        <p class="text-gray-600 mb-4">View profile picture for a user or group</p>
+
+        <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[250px]">
+                <label class="block text-sm font-medium text-gray-700 mb-2">JID (Phone or Group)</label>
+                <input type="text" id="profile-jid"
+                    placeholder="919876543210@s.whatsapp.net or group@g.us"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+            </div>
+            <button onclick="getProfilePicture()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Get Picture
+            </button>
+        </div>
+
+        <!-- Profile Picture Result -->
+        <div id="profile-result" class="mt-6 hidden">
+            <div id="profile-container" class="flex items-center space-x-4">
+                <img id="profile-image" src="" alt="Profile Picture" class="w-24 h-24 rounded-full object-cover border-4 border-gray-200">
+                <div>
+                    <p id="profile-jid-display" class="font-semibold text-gray-800"></p>
+                    <p id="profile-status" class="text-sm text-gray-600"></p>
+                </div>
+            </div>
+            <div id="profile-no-picture" class="hidden text-gray-500">
+                <svg class="w-24 h-24 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <p class="text-center mt-2">No profile picture available</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Presence Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Presence Status</h2>
+        <p class="text-gray-600 mb-4">Set your online/offline presence status</p>
+
+        <div class="flex flex-wrap gap-4">
+            <button onclick="setPresence('available')" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                <span class="w-3 h-3 bg-green-300 rounded-full mr-2"></span>
+                Set Online
+            </button>
+            <button onclick="setPresence('unavailable')" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
+                <span class="w-3 h-3 bg-gray-400 rounded-full mr-2"></span>
+                Set Offline
+            </button>
+        </div>
+        <p id="presence-status" class="mt-3 text-sm text-gray-600"></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Listen for contact check result
+    socket.on('contact_check_result', function(data) {
+        const resultsSection = document.getElementById('check-results');
+        const container = document.getElementById('results-container');
+
+        resultsSection.classList.remove('hidden');
+
+        if (!data.success) {
+            container.innerHTML = `<div class="text-red-600">Error: ${data.error}</div>`;
+            return;
+        }
+
+        const results = data.data;
+        container.innerHTML = results.map(r => {
+            const statusClass = r.is_registered ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300';
+            const statusIcon = r.is_registered
+                ? '<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>'
+                : '<svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>';
+
+            let businessBadge = '';
+            if (r.is_business) {
+                businessBadge = `<span class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Business${r.business_name ? ': ' + escapeHtml(r.business_name) : ''}</span>`;
+            }
+
+            return `
+                <div class="flex items-center justify-between p-3 border rounded-lg ${statusClass}">
+                    <div class="flex items-center space-x-3">
+                        ${statusIcon}
+                        <div>
+                            <p class="font-medium">${escapeHtml(r.query)}</p>
+                            ${r.is_registered ? `<p class="text-xs text-gray-600">${escapeHtml(r.jid || '')}</p>` : ''}
+                        </div>
+                        ${businessBadge}
+                    </div>
+                    <span class="text-sm font-medium ${r.is_registered ? 'text-green-700' : 'text-red-700'}">
+                        ${r.is_registered ? 'On WhatsApp' : 'Not on WhatsApp'}
+                    </span>
+                </div>
+            `;
+        }).join('');
+    });
+
+    // Listen for profile picture result
+    socket.on('contact_profile_pic_result', function(data) {
+        const resultSection = document.getElementById('profile-result');
+        const container = document.getElementById('profile-container');
+        const noPicture = document.getElementById('profile-no-picture');
+        const image = document.getElementById('profile-image');
+        const jidDisplay = document.getElementById('profile-jid-display');
+        const statusDisplay = document.getElementById('profile-status');
+
+        resultSection.classList.remove('hidden');
+
+        if (!data.success) {
+            container.classList.add('hidden');
+            noPicture.classList.remove('hidden');
+            noPicture.innerHTML = `<p class="text-red-600">Error: ${data.error}</p>`;
+            return;
+        }
+
+        jidDisplay.textContent = data.jid || '';
+
+        if (data.data.exists) {
+            container.classList.remove('hidden');
+            noPicture.classList.add('hidden');
+
+            if (data.data.data) {
+                // Base64 data available
+                image.src = 'data:image/jpeg;base64,' + data.data.data;
+            } else if (data.data.url) {
+                // URL available
+                image.src = data.data.url;
+            }
+            statusDisplay.textContent = 'Profile picture found';
+        } else {
+            container.classList.add('hidden');
+            noPicture.classList.remove('hidden');
+            noPicture.innerHTML = `
+                <svg class="w-24 h-24 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <p class="text-center mt-2">No profile picture available</p>
+            `;
+        }
+    });
+
+    // Listen for presence result
+    socket.on('presence_result', function(data) {
+        const status = document.getElementById('presence-status');
+        if (data.success) {
+            status.textContent = 'Presence updated successfully';
+            status.className = 'mt-3 text-sm text-green-600';
+        } else {
+            status.textContent = 'Failed: ' + data.error;
+            status.className = 'mt-3 text-sm text-red-600';
+        }
+    });
+
+    function checkContacts() {
+        const textarea = document.getElementById('phone-numbers');
+        const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        if (lines.length === 0) {
+            alert('Please enter at least one phone number');
+            return;
+        }
+
+        socket.emit('contact_check', { phones: lines });
+    }
+
+    function getProfilePicture() {
+        const jid = document.getElementById('profile-jid').value.trim();
+
+        if (!jid) {
+            alert('Please enter a JID');
+            return;
+        }
+
+        // Auto-append @s.whatsapp.net if no @ present
+        let fullJid = jid;
+        if (!jid.includes('@')) {
+            fullJid = jid + '@s.whatsapp.net';
+        }
+
+        socket.emit('contact_profile_pic', { jid: fullJid, preview: false });
+    }
+
+    function setPresence(status) {
+        socket.emit('presence', { status: status });
+        document.getElementById('presence-status').textContent = 'Setting presence...';
+        document.getElementById('presence-status').className = 'mt-3 text-sm text-blue-600';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

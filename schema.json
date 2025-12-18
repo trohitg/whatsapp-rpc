@@ -1,0 +1,1132 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "WhatsApp RPC API",
+    "version": "1.0.0",
+    "description": "JSON-RPC 2.0 API over WebSocket for WhatsApp messaging"
+  },
+  "servers": [
+    {
+      "name": "default",
+      "url": "ws://localhost:9400/ws/rpc"
+    }
+  ],
+  "methods": [
+    {
+      "name": "status",
+      "summary": "Get WhatsApp connection status",
+      "params": [],
+      "result": {
+        "name": "StatusResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "connected": { "type": "boolean", "description": "Whether WhatsApp is connected" },
+            "has_session": { "type": "boolean", "description": "Whether a session exists" },
+            "running": { "type": "boolean", "description": "Whether the service is running" },
+            "pairing": { "type": "boolean", "description": "Whether pairing is in progress" },
+            "device_id": { "type": "string", "description": "Device JID if connected" },
+            "timestamp": { "type": "string", "format": "date-time" }
+          },
+          "required": ["connected", "has_session", "running", "pairing", "timestamp"]
+        }
+      }
+    },
+    {
+      "name": "start",
+      "summary": "Start WhatsApp service",
+      "params": [],
+      "result": {
+        "name": "StartResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Started"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "stop",
+      "summary": "Stop WhatsApp service",
+      "params": [],
+      "result": {
+        "name": "StopResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Stopped"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "restart",
+      "summary": "Full reset: logout, delete DB, cleanup QR, reinit, start fresh",
+      "description": "Performs a complete reset: 1) Logout from WhatsApp servers, 2) Shutdown service, 3) Delete device session, 4) Delete database files, 5) Delete QR code files, 6) Reinitialize client, 7) Start pairing",
+      "params": [],
+      "result": {
+        "name": "RestartResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Restarted (session cleared)"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "reset",
+      "summary": "Reset WhatsApp session (logout and delete credentials)",
+      "params": [],
+      "result": {
+        "name": "ResetResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Reset"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "diagnostics",
+      "summary": "Get detailed diagnostics information",
+      "params": [],
+      "result": {
+        "name": "DiagnosticsResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "client_connected": { "type": "boolean" },
+            "client_logged_in": { "type": "boolean" },
+            "store_has_id": { "type": "boolean" },
+            "service_running": { "type": "boolean" },
+            "service_pairing": { "type": "boolean" },
+            "service_shutdown": { "type": "boolean" },
+            "events_channel_open": { "type": "boolean" },
+            "device_store": {
+              "type": "object",
+              "properties": {
+                "device_id": { "type": "string" },
+                "user": { "type": "string" },
+                "device": { "type": "integer" },
+                "server": { "type": "string" }
+              }
+            },
+            "timestamp": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    {
+      "name": "qr",
+      "summary": "Get current QR code for pairing",
+      "params": [],
+      "result": {
+        "name": "QRResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "has_qr": { "type": "boolean", "enum": [true] },
+            "code": { "type": "string", "description": "QR code content string" },
+            "filename": { "type": "string", "description": "PNG file path" },
+            "image_data": { "type": "string", "description": "Base64-encoded PNG data (for Docker/remote access)" }
+          },
+          "required": ["has_qr", "code", "filename"]
+        }
+      },
+      "errors": [
+        {
+          "code": -32001,
+          "message": "No QR available"
+        }
+      ]
+    },
+    {
+      "name": "send",
+      "summary": "Send a WhatsApp message",
+      "params": [
+        {
+          "name": "phone",
+          "description": "Recipient phone number (without + prefix)",
+          "schema": { "type": "string" },
+          "required": false
+        },
+        {
+          "name": "group_id",
+          "description": "Group JID (e.g., 123456789@g.us)",
+          "schema": { "type": "string" },
+          "required": false
+        },
+        {
+          "name": "type",
+          "description": "Message type",
+          "schema": {
+            "type": "string",
+            "enum": ["text", "image", "video", "audio", "document", "sticker", "location", "contact"]
+          },
+          "required": true
+        },
+        {
+          "name": "message",
+          "description": "Text content (for text messages)",
+          "schema": { "type": "string" },
+          "required": false
+        },
+        {
+          "name": "media_data",
+          "description": "Media content (for media messages)",
+          "schema": { "$ref": "#/components/schemas/MediaData" },
+          "required": false
+        },
+        {
+          "name": "location",
+          "description": "Location data (for location messages)",
+          "schema": { "$ref": "#/components/schemas/LocationData" },
+          "required": false
+        },
+        {
+          "name": "contact",
+          "description": "Contact card (for contact messages)",
+          "schema": { "$ref": "#/components/schemas/ContactCard" },
+          "required": false
+        },
+        {
+          "name": "reply",
+          "description": "Reply context for quoting a message",
+          "schema": { "$ref": "#/components/schemas/ReplyData" },
+          "required": false
+        },
+        {
+          "name": "metadata",
+          "description": "Custom metadata key-value pairs",
+          "schema": { "type": "object", "additionalProperties": { "type": "string" } },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "SendResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Sent"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "media",
+      "summary": "Download media from a received message",
+      "params": [
+        {
+          "name": "message_id",
+          "description": "Message ID containing media",
+          "schema": { "type": "string" },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "MediaResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "data": { "type": "string", "description": "Base64-encoded media data" },
+            "mime_type": { "type": "string", "description": "MIME type of the media" }
+          },
+          "required": ["data", "mime_type"]
+        }
+      }
+    },
+    {
+      "name": "groups",
+      "summary": "List all groups the user is a member of",
+      "params": [],
+      "result": {
+        "name": "GroupsResult",
+        "schema": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/GroupInfo" }
+        }
+      }
+    },
+    {
+      "name": "group_info",
+      "summary": "Get detailed information about a specific group",
+      "params": [
+        {
+          "name": "group_id",
+          "description": "Group JID (e.g., 123456789@g.us)",
+          "schema": { "type": "string" },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "GroupInfoResult",
+        "schema": { "$ref": "#/components/schemas/GroupInfo" }
+      }
+    },
+    {
+      "name": "group_update",
+      "summary": "Update group name and/or description",
+      "params": [
+        {
+          "name": "group_id",
+          "description": "Group JID",
+          "schema": { "type": "string" },
+          "required": true
+        },
+        {
+          "name": "name",
+          "description": "New group name",
+          "schema": { "type": "string" },
+          "required": false
+        },
+        {
+          "name": "topic",
+          "description": "New group description",
+          "schema": { "type": "string" },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "GroupUpdateResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Updated"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "contact_check",
+      "summary": "Check if phone numbers are registered on WhatsApp",
+      "params": [
+        {
+          "name": "phones",
+          "description": "Array of phone numbers to check (without + prefix)",
+          "schema": { "type": "array", "items": { "type": "string" } },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "ContactCheckResult",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "query": { "type": "string", "description": "Original phone number queried" },
+              "jid": { "type": "string", "description": "WhatsApp JID if registered" },
+              "is_registered": { "type": "boolean" },
+              "is_business": { "type": "boolean" },
+              "business_name": { "type": "string" }
+            },
+            "required": ["query", "is_registered"]
+          }
+        }
+      }
+    },
+    {
+      "name": "contact_profile_pic",
+      "summary": "Get profile picture for a user or group",
+      "params": [
+        {
+          "name": "jid",
+          "description": "User or group JID",
+          "schema": { "type": "string" },
+          "required": true
+        },
+        {
+          "name": "preview",
+          "description": "Get smaller preview image",
+          "schema": { "type": "boolean" },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "ProfilePicResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "exists": { "type": "boolean", "description": "Whether profile picture exists" },
+            "url": { "type": "string", "description": "URL to download image" },
+            "id": { "type": "string", "description": "Image identifier" },
+            "data": { "type": "string", "description": "Base64-encoded image data" }
+          },
+          "required": ["exists"]
+        }
+      }
+    },
+    {
+      "name": "typing",
+      "summary": "Send typing indicator to a chat",
+      "params": [
+        {
+          "name": "jid",
+          "description": "Chat JID (individual or group)",
+          "schema": { "type": "string" },
+          "required": true
+        },
+        {
+          "name": "state",
+          "description": "Typing state: 'composing' or 'paused'",
+          "schema": { "type": "string", "enum": ["composing", "paused"] },
+          "required": true
+        },
+        {
+          "name": "media",
+          "description": "Media type: '' for text, 'audio' for voice recording",
+          "schema": { "type": "string", "enum": ["", "text", "audio"] },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "TypingResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Typing indicator sent"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "presence",
+      "summary": "Set online/offline presence status",
+      "params": [
+        {
+          "name": "status",
+          "description": "Presence status: 'available' or 'unavailable'",
+          "schema": { "type": "string", "enum": ["available", "unavailable"] },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "PresenceResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Presence set"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "mark_read",
+      "summary": "Mark messages as read",
+      "params": [
+        {
+          "name": "message_ids",
+          "description": "Array of message IDs to mark as read",
+          "schema": { "type": "array", "items": { "type": "string" } },
+          "required": true
+        },
+        {
+          "name": "chat_jid",
+          "description": "Chat JID where messages are from",
+          "schema": { "type": "string" },
+          "required": true
+        },
+        {
+          "name": "sender_jid",
+          "description": "Sender JID (required for group messages)",
+          "schema": { "type": "string" },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "MarkReadResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string", "enum": ["Messages marked as read"] }
+          }
+        }
+      }
+    },
+    {
+      "name": "group_participants_add",
+      "summary": "Add participants to a group",
+      "params": [
+        {
+          "name": "group_id",
+          "description": "Group JID (e.g., 123456789@g.us)",
+          "schema": { "type": "string" },
+          "required": true
+        },
+        {
+          "name": "participants",
+          "description": "Array of phone numbers or JIDs to add",
+          "schema": { "type": "array", "items": { "type": "string" } },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "GroupParticipantsAddResult",
+        "schema": { "$ref": "#/components/schemas/GroupParticipantsResult" }
+      }
+    },
+    {
+      "name": "group_participants_remove",
+      "summary": "Remove participants from a group",
+      "params": [
+        {
+          "name": "group_id",
+          "description": "Group JID (e.g., 123456789@g.us)",
+          "schema": { "type": "string" },
+          "required": true
+        },
+        {
+          "name": "participants",
+          "description": "Array of phone numbers or JIDs to remove",
+          "schema": { "type": "array", "items": { "type": "string" } },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "GroupParticipantsRemoveResult",
+        "schema": { "$ref": "#/components/schemas/GroupParticipantsResult" }
+      }
+    },
+    {
+      "name": "group_invite_link",
+      "summary": "Get group invite link",
+      "params": [
+        {
+          "name": "group_id",
+          "description": "Group JID",
+          "schema": { "type": "string" },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "GroupInviteLinkResult",
+        "schema": { "$ref": "#/components/schemas/GroupInviteLinkResult" }
+      }
+    },
+    {
+      "name": "group_revoke_invite",
+      "summary": "Revoke and regenerate group invite link",
+      "params": [
+        {
+          "name": "group_id",
+          "description": "Group JID",
+          "schema": { "type": "string" },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "GroupRevokeInviteResult",
+        "schema": { "$ref": "#/components/schemas/GroupInviteLinkResult" }
+      }
+    },
+    {
+      "name": "rate_limit_get",
+      "summary": "Get rate limit configuration and statistics",
+      "params": [],
+      "result": {
+        "name": "RateLimitGetResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "config": { "$ref": "#/components/schemas/RateLimitConfig" },
+            "stats": { "$ref": "#/components/schemas/RateLimitStats" }
+          },
+          "required": ["config", "stats"]
+        }
+      }
+    },
+    {
+      "name": "rate_limit_set",
+      "summary": "Update rate limit configuration",
+      "params": [
+        {
+          "name": "enabled",
+          "description": "Enable/disable rate limiting",
+          "schema": { "type": "boolean" },
+          "required": false
+        },
+        {
+          "name": "min_delay_ms",
+          "description": "Minimum delay between messages (milliseconds)",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "max_delay_ms",
+          "description": "Maximum delay for randomization (milliseconds)",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "typing_delay_ms",
+          "description": "Typing indicator duration (milliseconds)",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "link_extra_delay_ms",
+          "description": "Extra delay for messages with links (milliseconds)",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "max_messages_per_minute",
+          "description": "Maximum messages per minute",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "max_messages_per_hour",
+          "description": "Maximum messages per hour",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "max_new_contacts_per_day",
+          "description": "Maximum new contacts per day",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "simulate_typing",
+          "description": "Send typing indicator before messages",
+          "schema": { "type": "boolean" },
+          "required": false
+        },
+        {
+          "name": "randomize_delays",
+          "description": "Add random variance to delays",
+          "schema": { "type": "boolean" },
+          "required": false
+        },
+        {
+          "name": "pause_on_low_response",
+          "description": "Auto-pause if response rate drops",
+          "schema": { "type": "boolean" },
+          "required": false
+        },
+        {
+          "name": "response_rate_threshold",
+          "description": "Minimum response rate threshold (0.0-1.0)",
+          "schema": { "type": "number" },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "RateLimitSetResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string" },
+            "config": { "$ref": "#/components/schemas/RateLimitConfig" }
+          }
+        }
+      }
+    },
+    {
+      "name": "rate_limit_stats",
+      "summary": "Get current rate limiting statistics only",
+      "params": [],
+      "result": {
+        "name": "RateLimitStatsResult",
+        "schema": { "$ref": "#/components/schemas/RateLimitStats" }
+      }
+    },
+    {
+      "name": "rate_limit_unpause",
+      "summary": "Resume rate limiting after automatic pause",
+      "params": [],
+      "result": {
+        "name": "RateLimitUnpauseResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string" },
+            "stats": { "$ref": "#/components/schemas/RateLimitStats" }
+          }
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "MediaData": {
+        "type": "object",
+        "description": "Media content for sending",
+        "properties": {
+          "data": { "type": "string", "description": "Base64-encoded media data" },
+          "mime_type": { "type": "string", "description": "MIME type (e.g., image/jpeg, video/mp4)" },
+          "filename": { "type": "string", "description": "Optional filename for documents" },
+          "caption": { "type": "string", "description": "Optional caption for images/videos" },
+          "thumbnail": { "type": "string", "description": "Optional base64 thumbnail" }
+        },
+        "required": ["data", "mime_type"]
+      },
+      "LocationData": {
+        "type": "object",
+        "description": "Location information",
+        "properties": {
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "name": { "type": "string", "description": "Location name" },
+          "address": { "type": "string", "description": "Address" }
+        },
+        "required": ["latitude", "longitude"]
+      },
+      "ContactCard": {
+        "type": "object",
+        "description": "Contact vCard",
+        "properties": {
+          "display_name": { "type": "string" },
+          "vcard": { "type": "string", "description": "vCard 3.0 format string" }
+        },
+        "required": ["display_name", "vcard"]
+      },
+      "ReplyData": {
+        "type": "object",
+        "description": "Reply context for quoting messages",
+        "properties": {
+          "message_id": { "type": "string", "description": "ID of message to reply to" },
+          "sender": { "type": "string", "description": "Sender JID of quoted message" },
+          "content": { "type": "string", "description": "Text preview of quoted message" }
+        },
+        "required": ["message_id", "sender", "content"]
+      },
+      "GroupInfo": {
+        "type": "object",
+        "description": "Group information",
+        "properties": {
+          "jid": { "type": "string", "description": "Group JID (e.g., 123456789@g.us)" },
+          "name": { "type": "string" },
+          "topic": { "type": "string", "description": "Group description" },
+          "owner": { "type": "string", "description": "Owner JID" },
+          "participants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GroupParticipant" }
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "size": { "type": "integer", "description": "Number of participants" },
+          "is_announce": { "type": "boolean", "description": "Only admins can send messages" },
+          "is_locked": { "type": "boolean", "description": "Only admins can edit group info" }
+        },
+        "required": ["jid", "name", "owner", "participants", "size"]
+      },
+      "GroupParticipant": {
+        "type": "object",
+        "description": "Group member with resolved phone number",
+        "properties": {
+          "jid": { "type": "string", "description": "Participant JID (may be LID format)" },
+          "phone": { "type": "string", "description": "Real phone number (resolved from LID if needed)" },
+          "name": { "type": "string" },
+          "is_admin": { "type": "boolean" },
+          "is_super_admin": { "type": "boolean", "description": "True for group owner" }
+        },
+        "required": ["jid", "phone", "is_admin", "is_super_admin"]
+      },
+      "GroupParticipantsResult": {
+        "type": "object",
+        "description": "Result of participant changes",
+        "properties": {
+          "group_id": { "type": "string", "description": "Group JID" },
+          "action": { "type": "string", "enum": ["add", "remove"], "description": "Action performed" },
+          "results": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GroupParticipantChangeResult" }
+          },
+          "added": { "type": "integer", "description": "Number of participants successfully added" },
+          "removed": { "type": "integer", "description": "Number of participants successfully removed" },
+          "failed": { "type": "integer", "description": "Number of failed operations" }
+        },
+        "required": ["group_id", "action", "results", "failed"]
+      },
+      "GroupParticipantChangeResult": {
+        "type": "object",
+        "description": "Result for a single participant change",
+        "properties": {
+          "jid": { "type": "string", "description": "Participant JID" },
+          "phone": { "type": "string", "description": "Phone number" },
+          "success": { "type": "boolean", "description": "Whether operation succeeded" },
+          "error": { "type": "string", "description": "Error message if failed" }
+        },
+        "required": ["jid", "success"]
+      },
+      "GroupInviteLinkResult": {
+        "type": "object",
+        "description": "Group invite link information",
+        "properties": {
+          "group_id": { "type": "string", "description": "Group JID" },
+          "invite_link": { "type": "string", "description": "Full invite link (https://chat.whatsapp.com/...)" },
+          "revoked": { "type": "boolean", "description": "Whether old link was revoked" }
+        },
+        "required": ["group_id", "invite_link"]
+      },
+      "RateLimitConfig": {
+        "type": "object",
+        "description": "Rate limiting configuration for anti-ban protection",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true, "description": "Enable rate limiting" },
+          "min_delay_ms": { "type": "integer", "default": 3000, "description": "Minimum delay between messages (ms)" },
+          "max_delay_ms": { "type": "integer", "default": 8000, "description": "Maximum delay for randomization (ms)" },
+          "typing_delay_ms": { "type": "integer", "default": 2000, "description": "Typing indicator duration (ms)" },
+          "link_extra_delay_ms": { "type": "integer", "default": 5000, "description": "Extra delay for messages with links (ms)" },
+          "max_messages_per_minute": { "type": "integer", "default": 10, "description": "Per-minute message limit" },
+          "max_messages_per_hour": { "type": "integer", "default": 60, "description": "Per-hour message limit" },
+          "max_new_contacts_per_day": { "type": "integer", "default": 20, "description": "Daily new contacts limit" },
+          "simulate_typing": { "type": "boolean", "default": true, "description": "Send typing indicator before messages" },
+          "randomize_delays": { "type": "boolean", "default": true, "description": "Add random variance to delays" },
+          "pause_on_low_response": { "type": "boolean", "default": false, "description": "Auto-pause if response rate drops" },
+          "response_rate_threshold": { "type": "number", "default": 0.3, "description": "Minimum response rate (0.0-1.0)" }
+        }
+      },
+      "RateLimitStats": {
+        "type": "object",
+        "description": "Current rate limiting statistics",
+        "properties": {
+          "messages_sent_last_minute": { "type": "integer", "description": "Messages sent in last 60 seconds" },
+          "messages_sent_last_hour": { "type": "integer", "description": "Messages sent in last 60 minutes" },
+          "messages_sent_today": { "type": "integer", "description": "Total messages sent today" },
+          "new_contacts_today": { "type": "integer", "description": "New contacts messaged today" },
+          "responses_received": { "type": "integer", "description": "Responses received today" },
+          "response_rate": { "type": "number", "description": "Response rate (responses/sent)" },
+          "is_paused": { "type": "boolean", "description": "Whether rate limiting is paused" },
+          "pause_reason": { "type": "string", "description": "Reason for pause if paused" },
+          "last_message_time": { "type": "string", "format": "date-time", "description": "Time of last sent message" },
+          "next_allowed_time": { "type": "string", "format": "date-time", "description": "Earliest time next message allowed" }
+        }
+      },
+      "ReceivedMedia": {
+        "type": "object",
+        "description": "Received media (image/video) information",
+        "properties": {
+          "mime_type": { "type": "string" },
+          "file_sha256": { "type": "string" },
+          "file_length": { "type": "integer" },
+          "caption": { "type": "string" },
+          "url": { "type": "string" },
+          "seconds": { "type": "integer", "description": "Duration for video" }
+        }
+      },
+      "ReceivedAudio": {
+        "type": "object",
+        "description": "Received audio/voice message information",
+        "properties": {
+          "mime_type": { "type": "string" },
+          "file_sha256": { "type": "string" },
+          "file_length": { "type": "integer" },
+          "seconds": { "type": "integer" },
+          "ptt": { "type": "boolean", "description": "True for voice messages (push-to-talk)" },
+          "url": { "type": "string" }
+        }
+      },
+      "ReceivedDocument": {
+        "type": "object",
+        "description": "Received document information",
+        "properties": {
+          "mime_type": { "type": "string" },
+          "file_sha256": { "type": "string" },
+          "file_length": { "type": "integer" },
+          "file_name": { "type": "string" },
+          "title": { "type": "string" },
+          "caption": { "type": "string" },
+          "url": { "type": "string" }
+        }
+      },
+      "ReceivedContact": {
+        "type": "object",
+        "description": "Received contact vCard",
+        "properties": {
+          "display_name": { "type": "string" },
+          "vcard": { "type": "string" }
+        }
+      },
+      "ReceivedSticker": {
+        "type": "object",
+        "description": "Received sticker information",
+        "properties": {
+          "mime_type": { "type": "string" },
+          "file_sha256": { "type": "string" },
+          "file_length": { "type": "integer" },
+          "is_animated": { "type": "boolean", "description": "True for animated stickers" },
+          "url": { "type": "string" }
+        }
+      }
+    },
+    "events": {
+      "description": "Server-sent notifications (JSON-RPC without id)",
+      "types": {
+        "event.status": {
+          "description": "Initial status sent on WebSocket connection",
+          "params": {
+            "connected": { "type": "boolean" },
+            "has_session": { "type": "boolean" },
+            "running": { "type": "boolean" },
+            "pairing": { "type": "boolean" },
+            "device_id": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" }
+          }
+        },
+        "event.connected": {
+          "description": "WhatsApp connected successfully",
+          "params": {
+            "status": { "type": "string", "enum": ["connected"] },
+            "device_id": { "type": "string" }
+          }
+        },
+        "event.disconnected": {
+          "description": "WhatsApp disconnected",
+          "params": {
+            "status": { "type": "string", "enum": ["disconnected"] },
+            "reason": { "type": "string" }
+          }
+        },
+        "event.connection_failure": {
+          "description": "Connection failed",
+          "params": {
+            "error": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        },
+        "event.logged_out": {
+          "description": "User logged out",
+          "params": {
+            "on_connect": { "type": "boolean" },
+            "reason": { "type": "string" }
+          }
+        },
+        "event.temporary_ban": {
+          "description": "Temporary ban received",
+          "params": {
+            "code": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        },
+        "event.qr_code": {
+          "description": "New QR code available for pairing",
+          "params": {
+            "code": { "type": "string", "description": "QR code content" },
+            "filename": { "type": "string", "description": "PNG file path" },
+            "image_data": { "type": "string", "description": "Base64-encoded PNG data" }
+          }
+        },
+        "event.message_sent": {
+          "description": "Message sent successfully",
+          "params": {
+            "message_id": { "type": "string" },
+            "to": { "type": "string" },
+            "type": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" }
+          }
+        },
+        "event.message_received": {
+          "description": "New message received",
+          "params": {
+            "message_id": { "type": "string" },
+            "sender": { "type": "string", "description": "Sender JID" },
+            "chat_id": { "type": "string", "description": "Chat JID (same as sender for DMs, group JID for groups)" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "is_from_me": { "type": "boolean" },
+            "is_group": { "type": "boolean" },
+            "message_type": {
+              "type": "string",
+              "enum": ["text", "image", "video", "audio", "document", "sticker", "location", "contact", "contacts"]
+            },
+            "content": { "type": "object", "description": "Message content (varies by type)" },
+            "text": { "type": "string", "description": "Text content (for text messages)" },
+            "image": { "$ref": "#/components/schemas/ReceivedMedia" },
+            "video": { "$ref": "#/components/schemas/ReceivedMedia" },
+            "audio": { "$ref": "#/components/schemas/ReceivedAudio" },
+            "document": { "$ref": "#/components/schemas/ReceivedDocument" },
+            "sticker": { "$ref": "#/components/schemas/ReceivedSticker" },
+            "location": { "$ref": "#/components/schemas/LocationData" },
+            "contact": { "$ref": "#/components/schemas/ReceivedContact" },
+            "contacts": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/ReceivedContact" }
+            },
+            "group_info": {
+              "type": "object",
+              "description": "Present for group messages",
+              "properties": {
+                "group_jid": { "type": "string" },
+                "sender_jid": { "type": "string" },
+                "sender_name": { "type": "string" }
+              }
+            },
+            "is_reply": { "type": "boolean" },
+            "quoted_message_id": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "examples": {
+    "request": {
+      "description": "JSON-RPC 2.0 request format",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "status",
+        "params": {}
+      }
+    },
+    "response": {
+      "description": "JSON-RPC 2.0 response format",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "connected": true,
+          "has_session": true,
+          "running": true,
+          "pairing": false,
+          "device_id": "1234567890@s.whatsapp.net",
+          "timestamp": "2025-01-15T10:30:00Z"
+        }
+      }
+    },
+    "event": {
+      "description": "JSON-RPC 2.0 notification (no id)",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "event.message_received",
+        "params": {
+          "message_id": "ABC123",
+          "sender": "1234567890@s.whatsapp.net",
+          "chat_id": "1234567890@s.whatsapp.net",
+          "timestamp": "2025-01-15T10:30:00Z",
+          "is_from_me": false,
+          "is_group": false,
+          "message_type": "text",
+          "text": "Hello world!",
+          "content": "Hello world!"
+        }
+      }
+    },
+    "send_text": {
+      "description": "Send text message",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "send",
+        "params": {
+          "phone": "1234567890",
+          "type": "text",
+          "message": "Hello from API!"
+        }
+      }
+    },
+    "send_image": {
+      "description": "Send image message",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "send",
+        "params": {
+          "phone": "1234567890",
+          "type": "image",
+          "media_data": {
+            "data": "base64_encoded_image_data",
+            "mime_type": "image/jpeg",
+            "caption": "Check this out!"
+          }
+        }
+      }
+    },
+    "send_to_group": {
+      "description": "Send message to group",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "send",
+        "params": {
+          "group_id": "123456789@g.us",
+          "type": "text",
+          "message": "Hello group!"
+        }
+      }
+    },
+    "send_location": {
+      "description": "Send location message",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "send",
+        "params": {
+          "phone": "1234567890",
+          "type": "location",
+          "location": {
+            "latitude": 37.7749,
+            "longitude": -122.4194,
+            "name": "San Francisco",
+            "address": "California, USA"
+          }
+        }
+      }
+    },
+    "download_media": {
+      "description": "Download media from message",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "media",
+        "params": {
+          "message_id": "ABC123DEF456"
+        }
+      }
+    },
+    "error_response": {
+      "description": "Error response format",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32000,
+          "message": "WhatsApp not connected"
+        }
+      }
+    },
+    "rate_limit_get": {
+      "description": "Get rate limit config and stats",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "rate_limit_get",
+        "params": {}
+      }
+    },
+    "rate_limit_set": {
+      "description": "Update rate limit configuration",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "rate_limit_set",
+        "params": {
+          "enabled": true,
+          "min_delay_ms": 5000,
+          "max_messages_per_hour": 30,
+          "simulate_typing": true
+        }
+      }
+    },
+    "rate_limit_unpause": {
+      "description": "Resume after automatic pause",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "rate_limit_unpause",
+        "params": {}
+      }
+    }
+  },
+  "errorCodes": {
+    "-32700": "Parse error - Invalid JSON",
+    "-32600": "Invalid Request - Not a valid JSON-RPC 2.0 request",
+    "-32601": "Method not found",
+    "-32602": "Invalid params",
+    "-32000": "Server error (WhatsApp operation failed)",
+    "-32001": "No QR available"
+  }
+}
