@@ -2,6 +2,8 @@
 
 WebSocket JSON-RPC 2.0 API for WhatsApp.
 
+<img width="1280" height="676" alt="image" src="https://github.com/user-attachments/assets/ddc7324a-8c4d-4557-ac6f-cb091a8ce31f" />
+
 ## Architecture
 
 ```
