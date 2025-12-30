@@ -414,9 +414,27 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 	messageType := "unknown"
 	var messageContent interface{}
 
+	// Helper function to extract forwarded info from ContextInfo
+	extractForwardedInfo := func(ctx interface{}) {
+		if ctx == nil {
+			return
+		}
+		// Use type assertion to access ContextInfo methods
+		type contextInfoGetter interface {
+			GetIsForwarded() bool
+			GetForwardingScore() uint32
+		}
+		if ci, ok := ctx.(contextInfoGetter); ok {
+			if ci.GetIsForwarded() {
+				eventData["is_forwarded"] = true
+				eventData["forwarding_score"] = ci.GetForwardingScore()
+			}
+		}
+	}
+
 	switch {
 	case msg.Conversation != nil && *msg.Conversation != "":
-		// Plain text message
+		// Plain text message (no ContextInfo, cannot be forwarded)
 		messageType = "text"
 		messageContent = *msg.Conversation
 		eventData["text"] = *msg.Conversation
@@ -428,6 +446,8 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 			messageContent = *msg.ExtendedTextMessage.Text
 			eventData["text"] = *msg.ExtendedTextMessage.Text
 		}
+		// Check forwarded status
+		extractForwardedInfo(msg.ExtendedTextMessage.ContextInfo)
 		// Check if it's a reply/quoted message
 		if msg.ExtendedTextMessage.ContextInfo != nil && msg.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
 			eventData["is_reply"] = true
@@ -452,6 +472,8 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 		}
 		messageContent = imageData
 		eventData["image"] = imageData
+		// Check forwarded status
+		extractForwardedInfo(msg.ImageMessage.ContextInfo)
 
 	case msg.VideoMessage != nil:
 		// Video message
@@ -470,6 +492,8 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 		}
 		messageContent = videoData
 		eventData["video"] = videoData
+		// Check forwarded status
+		extractForwardedInfo(msg.VideoMessage.ContextInfo)
 
 	case msg.AudioMessage != nil:
 		// Audio/Voice message
@@ -486,6 +510,8 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 		}
 		messageContent = audioData
 		eventData["audio"] = audioData
+		// Check forwarded status
+		extractForwardedInfo(msg.AudioMessage.ContextInfo)
 
 	case msg.DocumentMessage != nil:
 		// Document message
@@ -509,6 +535,8 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 		}
 		messageContent = docData
 		eventData["document"] = docData
+		// Check forwarded status
+		extractForwardedInfo(msg.DocumentMessage.ContextInfo)
 
 	case msg.StickerMessage != nil:
 		// Sticker message
@@ -524,6 +552,8 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 		}
 		messageContent = stickerData
 		eventData["sticker"] = stickerData
+		// Check forwarded status
+		extractForwardedInfo(msg.StickerMessage.ContextInfo)
 
 	case msg.LocationMessage != nil:
 		// Location message

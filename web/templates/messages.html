@@ -134,6 +134,8 @@
         const sender = formatSender(data.sender);
         const isFromMe = data.is_from_me;
         const isGroup = data.is_group || false;
+        const isForwarded = data.is_forwarded || false;
+        const forwardingScore = data.forwarding_score || 0;
         const chatId = data.chat_id || '';
 
         // Get group name if it's a group message
@@ -268,6 +270,13 @@
             groupInfoHtml = `<p class="text-xs text-purple-600">in <span class="font-medium">${escapeHtml(displayGroupName)}</span></p>`;
         }
 
+        // Build forwarded indicator
+        let forwardedHtml = '';
+        if (isForwarded) {
+            const forwardedLabel = forwardingScore > 4 ? 'Forwarded many times' : 'Forwarded';
+            forwardedHtml = `<span class="inline-block px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700 ml-1" title="Forwarding score: ${forwardingScore}">&#8631; ${forwardedLabel}</span>`;
+        }
+
         return `
             <div class="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition ${isFromMe ? 'border-l-4 border-green-500' : isGroup ? 'border-l-4 border-purple-500' : 'border-l-4 border-blue-500'}">
                 <div class="flex justify-between items-start mb-2">
@@ -276,7 +285,7 @@
                         <div>
                             <p class="font-semibold text-gray-800">${sender}</p>
                             ${groupInfoHtml}
-                            <span class="inline-block px-2 py-1 rounded text-xs font-medium ${typeColor}">${messageType}</span>
+                            <span class="inline-block px-2 py-1 rounded text-xs font-medium ${typeColor}">${messageType}</span>${forwardedHtml}
                         </div>
                     </div>
                     <div class="text-right">

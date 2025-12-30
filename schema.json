@@ -929,6 +929,8 @@
             "timestamp": { "type": "string", "format": "date-time" },
             "is_from_me": { "type": "boolean" },
             "is_group": { "type": "boolean" },
+            "is_forwarded": { "type": "boolean", "description": "Whether the message was forwarded" },
+            "forwarding_score": { "type": "integer", "description": "Number of times forwarded (higher = forwarded many times)" },
             "message_type": {
               "type": "string",
               "enum": ["text", "image", "video", "audio", "document", "sticker", "location", "contact", "contacts"]
