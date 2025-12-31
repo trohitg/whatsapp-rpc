@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -415,20 +416,13 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 	var messageContent interface{}
 
 	// Helper function to extract forwarded info from ContextInfo
-	extractForwardedInfo := func(ctx interface{}) {
+	extractForwardedInfo := func(ctx *waE2E.ContextInfo) {
 		if ctx == nil {
 			return
 		}
-		// Use type assertion to access ContextInfo methods
-		type contextInfoGetter interface {
-			GetIsForwarded() bool
-			GetForwardingScore() uint32
-		}
-		if ci, ok := ctx.(contextInfoGetter); ok {
-			if ci.GetIsForwarded() {
-				eventData["is_forwarded"] = true
-				eventData["forwarding_score"] = ci.GetForwardingScore()
-			}
+		if ctx.GetIsForwarded() {
+			eventData["is_forwarded"] = true
+			eventData["forwarding_score"] = ctx.GetForwardingScore()
 		}
 	}
 
