@@ -1,4 +1,4 @@
-# WhatsApp RPC
+# WhatsApp WEB RPC
 
 [![npm version](https://img.shields.io/npm/v/whatsapp-rpc.svg)](https://www.npmjs.com/package/whatsapp-rpc)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
