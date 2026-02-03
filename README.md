@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/whatsapp-rpc.svg)](https://www.npmjs.com/package/whatsapp-rpc)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-WebSocket JSON-RPC 2.0 API for WhatsApp.
+WebSocket JSON-RPC 2.0 API for QR Based WhatsApp Web.
 
 <img width="1280" height="676" alt="image" src="https://github.com/user-attachments/assets/ddc7324a-8c4d-4557-ac6f-cb091a8ce31f" />
 
