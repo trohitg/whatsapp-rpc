@@ -5,7 +5,7 @@
  *
  * Skip conditions:
  * - WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD=1
- * - CI=true (CI builds from source)
+ * - CI=true (CI environments skip download)
  * - Binary already exists
  * - Go is installed and WHATSAPP_RPC_PREFER_SOURCE=1
  */
@@ -14,6 +14,7 @@ import { createWriteStream, existsSync, mkdirSync, chmodSync, readFileSync, unli
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import http from 'http';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -55,7 +56,7 @@ function hasGo() {
 
 // Download file with redirect handling
 function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, reject) => {
     // Remove partial download if exists
     if (existsSync(dest)) {
       try { unlinkSync(dest); } catch { /* ignore */ }
@@ -67,7 +68,7 @@ function downloadFile(url, dest) {
         return;
       }
 
-      const protocol = currentUrl.startsWith('https') ? https : require('http');
+      const protocol = currentUrl.startsWith('https') ? https : http;
 
       protocol.get(currentUrl, (response) => {
         // Handle redirects (GitHub releases redirect to CDN)
@@ -102,7 +103,7 @@ function downloadFile(url, dest) {
         file.on('finish', () => {
           file.close();
           console.log(' Done');
-          resolve();
+          resolvePromise();
         });
         file.on('error', (err) => {
           file.close();
@@ -128,7 +129,7 @@ async function main() {
   }
 
   if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
-    console.log('[whatsapp-rpc] Skipping binary download (CI environment - will build from source)');
+    console.log('[whatsapp-rpc] Skipping binary download (CI environment)');
     return;
   }
 
@@ -195,6 +196,6 @@ async function main() {
 main().catch((err) => {
   // Don't fail npm install - just log and continue
   console.error('[whatsapp-rpc] Binary download error:', err.message);
-  console.log('[whatsapp-rpc] WhatsApp features will not work until binary is built.');
+  console.log('[whatsapp-rpc] WhatsApp features will not work until binary is available.');
   console.log('[whatsapp-rpc] Build from source with: npm run build');
 });

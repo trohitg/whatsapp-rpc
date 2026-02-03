@@ -1,4 +1,4 @@
-name: Release Binaries
+name: Release
 
 on:
   push:
@@ -10,6 +10,7 @@ permissions:
   packages: write
 
 jobs:
+  # Step 1: Build cross-platform Go binaries
   build:
     name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
     strategy:
@@ -71,6 +72,7 @@ jobs:
           path: whatsapp-rpc-server-*
           retention-days: 1
 
+  # Step 2: Create GitHub Release with binaries attached
   release:
     name: Create Release
     needs: build
@@ -96,6 +98,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Step 3: Publish to npm (after release so binaries are downloadable)
   publish-npm:
     name: Publish to npm
     needs: release
@@ -114,12 +117,16 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
+      - name: Verify package contents
+        run: npm pack --dry-run
+
       - name: Publish to npm
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-gpr:
+  # Step 4: Publish to GitHub Packages (parallel with npm)
+  publish-github-packages:
     name: Publish to GitHub Packages
     needs: release
     runs-on: ubuntu-latest

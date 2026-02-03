@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Standalone clean script - no npm dependencies required
+// Uses CommonJS for compatibility when node_modules doesn't exist
 const { existsSync, unlinkSync, readdirSync, rmSync } = require('fs');
 const { join } = require('path');
 const { execSync } = require('child_process');
@@ -7,9 +8,10 @@ const { execSync } = require('child_process');
 const ROOT = join(__dirname, '..');
 const BIN = process.platform === 'win32' ? 'whatsapp-rpc-server.exe' : 'whatsapp-rpc-server';
 const BIN_DIR = join(ROOT, 'bin');
+const API_PORT = 9400;
 
 const log = (msg, color) => {
-  const colors = { green: '\x1b[32m', blue: '\x1b[34m', yellow: '\x1b[33m', reset: '\x1b[0m' };
+  const colors = { green: '\x1b[32m', blue: '\x1b[34m', yellow: '\x1b[33m', red: '\x1b[31m', reset: '\x1b[0m' };
   console.log(`${colors[color] || ''}${msg}${colors.reset}`);
 };
 
@@ -25,9 +27,8 @@ const killPort = (port, name) => {
   } catch { log(`${name} not running`, 'yellow'); }
 };
 
-log('Stopping all processes...', 'blue');
-killPort(9400, 'API');
-killPort(5000, 'Web');
+log('Stopping API server...', 'blue');
+killPort(API_PORT, 'API');
 
 // Remove binary
 const bin = join(BIN_DIR, BIN);
@@ -38,7 +39,7 @@ if (existsSync(BIN_DIR) && readdirSync(BIN_DIR).length === 0) {
   rmSync(BIN_DIR, { recursive: true }); log('Removed bin/', 'green');
 }
 
-// Remove entire data directory (database, QR codes, etc.)
+// Remove data directory (database, QR codes, etc.)
 const dataDir = join(ROOT, 'data');
 if (existsSync(dataDir)) {
   rmSync(dataDir, { recursive: true });
@@ -54,10 +55,6 @@ readdirSync(ROOT).filter(f => f.endsWith('.db') || f.endsWith('.db-wal') || f.en
 // Remove node_modules
 const nodeModules = join(ROOT, 'node_modules');
 if (existsSync(nodeModules)) { rmSync(nodeModules, { recursive: true }); log('Removed node_modules/', 'green'); }
-
-// Remove Python cache
-const pycache = join(ROOT, 'web', '__pycache__');
-if (existsSync(pycache)) { rmSync(pycache, { recursive: true }); log('Removed web/__pycache__/', 'green'); }
 
 // Remove package-lock.json
 const lockFile = join(ROOT, 'package-lock.json');

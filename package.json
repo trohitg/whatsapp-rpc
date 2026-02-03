@@ -27,7 +27,6 @@
   "files": [
     "bin/",
     "scripts/",
-    "src/",
     "configs/",
     "README.md"
   ],
@@ -39,20 +38,13 @@
   },
   "scripts": {
     "postinstall": "node scripts/download-binary.js",
-    "prestart": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "start": "node scripts/cli.js start",
-    "prestop": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "stop": "node scripts/cli.js stop",
-    "prerestart": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "restart": "node scripts/cli.js restart",
-    "prestatus": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "status": "node scripts/cli.js status",
-    "preapi": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "api": "node scripts/cli.js api --foreground",
-    "preweb": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "web": "node scripts/cli.js web",
-    "prebuild": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
-    "build": "node -e \"const fs=require('fs'),p=process.platform==='win32'?'.exe':'',d='bin';fs.existsSync(d)||fs.mkdirSync(d);require('child_process').execSync('go build -v -o '+d+'/whatsapp-rpc-server'+p+' ./src/go/cmd/server',{stdio:'inherit'});console.log('Build complete: '+d+'/whatsapp-rpc-server'+p)\"",
+    "build": "node scripts/cli.js build",
     "clean": "node scripts/clean.cjs"
   },
   "dependencies": {
