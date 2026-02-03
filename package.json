@@ -1,10 +1,44 @@
 {
-  "name": "whatsapp-rpc",
-  "version": "1.0.0",
+  "name": "@anthropic/whatsapp-rpc",
+  "version": "0.0.1",
   "type": "module",
-  "description": "WhatsApp WebSocket RPC Server",
-  "bin": { "wa": "scripts/cli.js" },
+  "description": "WhatsApp WebSocket RPC Server with JSON-RPC 2.0 protocol",
+  "author": "Rohit G <trohitg@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/trohitg/whatsapp-rpc#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trohitg/whatsapp-rpc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/trohitg/whatsapp-rpc/issues"
+  },
+  "keywords": [
+    "whatsapp",
+    "rpc",
+    "websocket",
+    "json-rpc",
+    "messaging",
+    "automation"
+  ],
+  "bin": {
+    "whatsapp-rpc": "./scripts/cli.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "src/",
+    "configs/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+    "postinstall": "node scripts/download-binary.js",
     "prestart": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "start": "node scripts/cli.js start",
     "prestop": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
@@ -14,7 +48,7 @@
     "prestatus": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "status": "node scripts/cli.js status",
     "preapi": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
-    "api": "node scripts/cli.js api",
+    "api": "node scripts/cli.js api --foreground",
     "preweb": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
     "web": "node scripts/cli.js web",
     "prebuild": "node -e \"require('fs').existsSync('node_modules')||require('child_process').execSync('npm i',{stdio:'inherit'})\"",
