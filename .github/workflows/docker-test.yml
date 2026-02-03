@@ -24,6 +24,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           tags: whatsapp-rpc:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
