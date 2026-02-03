@@ -7,10 +7,30 @@ on:
     branches: [main]
 
 jobs:
-  # Validate Go build
-  build-go:
-    name: Build Go
-    runs-on: ubuntu-latest
+  # Build cross-platform binaries (same as release, to catch failures early)
+  build-binaries:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
@@ -22,10 +42,24 @@ jobs:
           go-version: '1.22'
           cache: true
 
-      - name: Build
-        run: go build -v ./src/go/cmd/server
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        shell: bash
+        run: |
+          ext=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            ext=".exe"
+          fi
+          output_name="whatsapp-rpc-server-${{ matrix.goos }}-${{ matrix.goarch }}${ext}"
+          echo "Building ${output_name}..."
+          go build -ldflags="-s -w" -o "${output_name}" ./src/go/cmd/server
+          ls -la "${output_name}"
 
-      - name: Test
+      - name: Run tests
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
         run: go test -v ./src/go/...
 
   # Validate npm package
