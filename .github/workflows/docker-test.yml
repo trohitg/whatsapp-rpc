@@ -1,0 +1,36 @@
+name: Docker Build Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docker-build:
+    name: Test Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: whatsapp-rpc:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test container starts
+        run: |
+          docker run -d --name test-container -p 9400:9400 whatsapp-rpc:test
+          sleep 5
+          docker logs test-container
+          docker stop test-container
