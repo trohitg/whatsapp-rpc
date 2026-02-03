@@ -42,6 +42,16 @@ func main() {
 		logger.Fatalf("Failed to initialize WhatsApp service: %v", err)
 	}
 
+	// Auto-start if there's an existing session (no need to press Start button)
+	if whatsappService.HasExistingSession() {
+		logger.Info("Existing session found, auto-connecting...")
+		if err := whatsappService.Start(); err != nil {
+			logger.Warnf("Auto-start failed: %v (user can manually start)", err)
+		}
+	} else {
+		logger.Info("No existing session, waiting for user to start pairing")
+	}
+
 	// Create and start server (WebSocket RPC only)
 	srv := server.New(whatsappService, logger)
 	router := srv.SetupRoutes()

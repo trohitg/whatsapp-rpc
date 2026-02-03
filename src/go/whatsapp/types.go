@@ -82,8 +82,9 @@ type GroupInfo struct {
 	Participants []GroupParticipant `json:"participants"`
 	CreatedAt    time.Time          `json:"created_at"`
 	Size         int                `json:"size"`
-	IsAnnounce   bool               `json:"is_announce"`  // Only admins can send messages
-	IsLocked     bool               `json:"is_locked"`    // Only admins can edit group info
+	IsAnnounce   bool               `json:"is_announce"`   // Only admins can send messages
+	IsLocked     bool               `json:"is_locked"`     // Only admins can edit group info
+	IsCommunity  bool               `json:"is_community"`  // True if this is a community (parent group)
 }
 
 // GroupUpdateRequest represents parameters for updating a group

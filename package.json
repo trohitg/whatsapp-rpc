@@ -1,5 +1,5 @@
 {
-  "name": "@anthropic/whatsapp-rpc",
+  "name": "@trohitg/whatsapp-rpc",
   "version": "0.0.1",
   "type": "module",
   "description": "WhatsApp WebSocket RPC Server with JSON-RPC 2.0 protocol",
