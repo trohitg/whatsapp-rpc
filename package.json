@@ -1,6 +1,6 @@
 {
-  "name": "whatsapp-rpc.go",
-  "version": "0.0.3",
+  "name": "whatsapp-rpc",
+  "version": "0.0.4",
   "type": "module",
   "description": "WhatsApp WebSocket RPC Server with JSON-RPC 2.0 protocol",
   "author": "Rohit G <trohitg@gmail.com>",
