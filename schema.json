@@ -62,8 +62,8 @@
     },
     {
       "name": "restart",
-      "summary": "Full reset: logout, delete DB, cleanup QR, reinit, start fresh",
-      "description": "Performs a complete reset: 1) Logout from WhatsApp servers, 2) Shutdown service, 3) Delete device session, 4) Delete database files, 5) Delete QR code files, 6) Reinitialize client, 7) Start pairing",
+      "summary": "Full reset: logout, delete DB, clear QR cache, reinit, start fresh",
+      "description": "Performs a complete reset: 1) Logout from WhatsApp servers, 2) Shutdown service, 3) Delete device session, 4) Delete database files, 5) Clear QR cache, 6) Reinitialize client, 7) Start pairing",
       "params": [],
       "result": {
         "name": "RestartResult",
@@ -130,10 +130,9 @@
           "properties": {
             "has_qr": { "type": "boolean", "enum": [true] },
             "code": { "type": "string", "description": "QR code content string" },
-            "filename": { "type": "string", "description": "PNG file path" },
-            "image_data": { "type": "string", "description": "Base64-encoded PNG data (for Docker/remote access)" }
+            "image_data": { "type": "string", "description": "Base64-encoded PNG data" }
           },
-          "required": ["has_qr", "code", "filename"]
+          "required": ["has_qr", "code", "image_data"]
         }
       },
       "errors": [
@@ -1060,7 +1059,6 @@
           "description": "New QR code available for pairing",
           "params": {
             "code": { "type": "string", "description": "QR code content" },
-            "filename": { "type": "string", "description": "PNG file path" },
             "image_data": { "type": "string", "description": "Base64-encoded PNG data" }
           }
         },

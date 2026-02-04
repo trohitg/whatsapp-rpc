@@ -12,8 +12,7 @@ type Event struct {
 // QRCodeData represents QR code information
 type QRCodeData struct {
 	Code      string    `json:"code"`
-	Filename  string    `json:"filename"`
-	ImageData string    `json:"image_data,omitempty"` // Base64 PNG data
+	ImageData string    `json:"image_data"` // Base64 PNG data
 	Time      time.Time `json:"timestamp"`
 }
 

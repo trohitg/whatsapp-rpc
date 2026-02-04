@@ -1,6 +1,7 @@
 # WhatsApp WEB RPC
 
 [![npm version](https://img.shields.io/npm/v/whatsapp-rpc.svg)](https://www.npmjs.com/package/whatsapp-rpc)
+[![PyPI version](https://img.shields.io/pypi/v/whatsapp-rpc.svg)](https://pypi.org/project/whatsapp-rpc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 WebSocket JSON-RPC 2.0 API for QR Based WhatsApp Web.
@@ -64,7 +65,6 @@ Data Storage:
 ┌─────────────────────────────────────────────────────────┐
 │  data/                                                   │
 │  ├── whatsapp.db    (SQLite: session, contacts, history)│
-│  ├── qr/*.png       (QR code images)                    │
 │  └── groups.json    (Group cache)                       │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -78,6 +78,9 @@ npx whatsapp-rpc restart         # Restart API server
 npx whatsapp-rpc status          # Check if running
 npx whatsapp-rpc api --foreground  # Run in foreground (for Docker)
 npx whatsapp-rpc build           # Build from source (requires Go)
+
+# Custom port
+npx whatsapp-rpc start --port 8080
 ```
 
 ## Docker
@@ -106,7 +109,7 @@ Connect via WebSocket to `ws://localhost:9400/ws/rpc` and send JSON-RPC 2.0 requ
 | `restart` | Full reset: logout, delete DB, cleanup, start fresh |
 | `reset` | Reset session (logout and delete credentials) |
 | `diagnostics` | Get detailed diagnostics information |
-| `qr` | Get QR code for pairing (code, filename, image_data as base64 PNG) |
+| `qr` | Get QR code for pairing (code, image_data as base64 PNG) |
 
 ### Messaging
 
@@ -172,7 +175,7 @@ The server pushes events as JSON-RPC notifications (no `id` field):
 | `event.connection_failure` | Connection failed |
 | `event.logged_out` | User logged out |
 | `event.temporary_ban` | Temporary ban received |
-| `event.qr_code` | New QR code available (code, filename, image_data) |
+| `event.qr_code` | New QR code available (code, image_data) |
 | `event.message_sent` | Message sent successfully |
 | `event.message_received` | New message received (includes forwarding info) |
 | `event.history_sync_complete` | History sync completed after first login |
@@ -334,6 +337,7 @@ The server pushes events as JSON-RPC notifications (no `id` field):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 9400 | WebSocket API port |
+| `WHATSAPP_RPC_PORT` | 9400 | WebSocket API port (alternative to `PORT`) |
 | `WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD` | - | Set to `1` to skip binary download |
 | `WHATSAPP_RPC_PREFER_SOURCE` | - | Set to `1` to build from source if Go is installed |
 
@@ -342,7 +346,6 @@ The server pushes events as JSON-RPC notifications (no `id` field):
 | Path | Description |
 |------|-------------|
 | `data/whatsapp.db` | SQLite database (session, contacts, message history) |
-| `data/qr/*.png` | QR code images for pairing |
 | `data/groups.json` | Group cache (auto-generated on connection) |
 
 ## Building from Source
@@ -356,6 +359,33 @@ npm run build
 ## Full Schema
 
 See [schema.json](schema.json) for complete OpenRPC specification.
+
+## Python Client
+
+An async Python client is available on PyPI:
+
+```bash
+pip install whatsapp-rpc
+```
+
+```python
+import asyncio
+from whatsapp_rpc import WhatsAppRPCClient
+
+async def main():
+    client = WhatsAppRPCClient("ws://localhost:9400/ws/rpc")
+    await client.connect()
+
+    status = await client.status()
+    print(status)
+
+    await client.send(phone="1234567890", type="text", message="Hello!")
+    await client.close()
+
+asyncio.run(main())
+```
+
+See [src/python/README.md](src/python/README.md) for full Python client documentation.
 
 ## Requirements
 

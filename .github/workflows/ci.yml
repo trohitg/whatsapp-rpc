@@ -111,3 +111,28 @@ jobs:
           sleep 5
           docker logs test-container
           docker stop test-container
+
+  # Validate Python package
+  build-python:
+    name: Build Python
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build package
+        working-directory: src/python
+        run: python -m build
+
+      - name: Check package
+        working-directory: src/python
+        run: twine check dist/*

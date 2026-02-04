@@ -11,9 +11,17 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const API_PORT = 9400;
+const DEFAULT_PORT = 9400;
 const BIN = process.platform === 'win32' ? 'whatsapp-rpc-server.exe' : 'whatsapp-rpc-server';
 const BIN_DIR = join(ROOT, 'bin');
+
+// Get port from environment or default
+const getPort = (opts = {}) => {
+  if (opts.port) return parseInt(opts.port, 10);
+  if (process.env.PORT) return parseInt(process.env.PORT, 10);
+  if (process.env.WHATSAPP_RPC_PORT) return parseInt(process.env.WHATSAPP_RPC_PORT, 10);
+  return DEFAULT_PORT;
+};
 
 const log = (m, c = 'blue') => console.log(chalk[c](m));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -43,8 +51,11 @@ const hasGo = () => {
   catch { return false; }
 };
 
-async function api(foreground = false) {
-  if (await portUp(API_PORT)) { log(`API already running on port ${API_PORT}`, 'yellow'); return; }
+async function api(opts = {}) {
+  const port = getPort(opts);
+  const foreground = opts.foreground || false;
+
+  if (await portUp(port)) { log(`API already running on port ${port}`, 'yellow'); return; }
   const bin = join(BIN_DIR, BIN);
   if (!existsSync(bin)) {
     if (!hasGo()) {
@@ -59,27 +70,35 @@ async function api(foreground = false) {
     await build();
   }
 
+  // Pass port to Go binary via environment variable
+  const env = { ...process.env, WA_SERVER_PORT: String(port) };
+
   if (foreground) {
     // Run in foreground - will receive Ctrl+C signals
-    const proc = spawn(bin, [], { cwd: ROOT, stdio: 'inherit' });
+    const proc = spawn(bin, [], { cwd: ROOT, stdio: 'inherit', env });
     proc.on('close', (code) => process.exit(code || 0));
     process.on('SIGINT', () => { proc.kill('SIGINT'); });
     process.on('SIGTERM', () => { proc.kill('SIGTERM'); });
-    log(`API running: ws://localhost:${API_PORT}/ws/rpc`, 'green');
+    log(`API running: ws://localhost:${port}/ws/rpc`, 'green');
   } else {
     // Run detached in background
-    spawn(bin, [], { cwd: ROOT, detached: true, stdio: 'ignore' }).unref();
-    if (await wait(API_PORT)) log(`API started: ws://localhost:${API_PORT}/ws/rpc`, 'green');
+    spawn(bin, [], { cwd: ROOT, detached: true, stdio: 'ignore', env }).unref();
+    if (await wait(port)) log(`API started: ws://localhost:${port}/ws/rpc`, 'green');
     else log('API failed to start', 'red');
   }
 }
 
-async function start() { await api(); }
-async function stop() { await kill(API_PORT, 'API'); }
+async function start(opts = {}) { await api(opts); }
 
-async function status() {
-  const a = await portUp(API_PORT);
-  log(`API (${API_PORT}): ${a ? 'UP' : 'DOWN'}`, a ? 'green' : 'red');
+async function stop(opts = {}) {
+  const port = getPort(opts);
+  await kill(port, 'API');
+}
+
+async function status(opts = {}) {
+  const port = getPort(opts);
+  const a = await portUp(port);
+  log(`API (${port}): ${a ? 'UP' : 'DOWN'}`, a ? 'green' : 'red');
 }
 
 async function build() {
@@ -110,11 +129,14 @@ async function build() {
   log(`Built: ${BIN} (${(statSync(bin).size / 1024 / 1024).toFixed(1)}MB)`, 'green');
 }
 
-program.name('whatsapp-rpc').version('1.0.0');
-program.command('start').description('Start API server').action(start);
-program.command('stop').description('Stop API server').action(stop);
-program.command('restart').description('Restart API server').action(async () => { await stop(); await sleep(1000); await start(); });
-program.command('status').description('Show server status').action(status);
-program.command('api').description('Start API server').option('-f, --foreground', 'Run in foreground').action((opts) => api(opts.foreground));
+// Global port option for all commands
+const portOption = ['-p, --port <port>', 'API port (default: 9400, or PORT/WHATSAPP_RPC_PORT env var)'];
+
+program.name('whatsapp-rpc').version('0.0.7');
+program.command('start').description('Start API server').option(...portOption).action(start);
+program.command('stop').description('Stop API server').option(...portOption).action(stop);
+program.command('restart').description('Restart API server').option(...portOption).action(async (opts) => { await stop(opts); await sleep(1000); await start(opts); });
+program.command('status').description('Show server status').option(...portOption).action(status);
+program.command('api').description('Start API server').option('-f, --foreground', 'Run in foreground').option(...portOption).action(api);
 program.command('build').description('Build binary from source (requires Go)').action(build);
 program.parse();

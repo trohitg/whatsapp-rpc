@@ -1,9 +1,7 @@
 package server
 
 import (
-	"encoding/base64"
 	"encoding/json"
-	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -66,8 +64,8 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 		resp.Result = map[string]string{"message": "Stopped"}
 
 	case "restart":
-		// Full restart: cleanup QR codes, reset session, then start fresh
-		h.service.CleanupQRCodes()
+		// Full restart: clear QR cache, reset session, then start fresh
+		h.service.ClearQRCode()
 		if err := h.service.Reset(); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else if err := h.service.Start(); err != nil {
@@ -88,17 +86,11 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 
 	case "qr":
 		if qr := h.service.GetCurrentQRCode(); qr != nil {
-			result := map[string]interface{}{
-				"has_qr":   true,
-				"code":     qr.Code,
-				"filename": qr.Filename,
+			resp.Result = map[string]interface{}{
+				"has_qr":     true,
+				"code":       qr.Code,
+				"image_data": qr.ImageData,
 			}
-			// Read PNG file and encode to base64 for Docker compatibility
-			// qr.Filename already contains full path like "data/qr/qr_xxx.png"
-			if data, err := os.ReadFile(qr.Filename); err == nil {
-				result["image_data"] = base64.StdEncoding.EncodeToString(data)
-			}
-			resp.Result = result
 		} else {
 			resp.Error = &RPCError{Code: -32001, Message: "No QR available"}
 		}

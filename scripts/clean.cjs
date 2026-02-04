@@ -8,7 +8,15 @@ const { execSync } = require('child_process');
 const ROOT = join(__dirname, '..');
 const BIN = process.platform === 'win32' ? 'whatsapp-rpc-server.exe' : 'whatsapp-rpc-server';
 const BIN_DIR = join(ROOT, 'bin');
-const API_PORT = 9400;
+const DEFAULT_PORT = 9400;
+
+// Get port from environment or default
+const getPort = () => {
+  if (process.env.PORT) return parseInt(process.env.PORT, 10);
+  if (process.env.WHATSAPP_RPC_PORT) return parseInt(process.env.WHATSAPP_RPC_PORT, 10);
+  return DEFAULT_PORT;
+};
+const API_PORT = getPort();
 
 const log = (msg, color) => {
   const colors = { green: '\x1b[32m', blue: '\x1b[34m', yellow: '\x1b[33m', red: '\x1b[31m', reset: '\x1b[0m' };

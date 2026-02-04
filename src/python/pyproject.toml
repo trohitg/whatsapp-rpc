@@ -4,12 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whatsapp-rpc"
-version = "1.0.0"
-description = "Python client for WhatsApp RPC API"
+version = "0.0.7"
+description = "Python async client for WhatsApp RPC WebSocket API"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.8"
+authors = [
+    {name = "Rohit G", email = "trohitg@gmail.com"}
+]
+keywords = ["whatsapp", "rpc", "websocket", "json-rpc", "messaging", "async"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: AsyncIO",
+    "Topic :: Communications :: Chat",
+]
 dependencies = [
     "websockets>=12.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/trohitg/whatsapp-rpc"
+Repository = "https://github.com/trohitg/whatsapp-rpc"
+Issues = "https://github.com/trohitg/whatsapp-rpc/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

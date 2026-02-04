@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -230,8 +231,8 @@ func (s *Service) startPairing() error {
 			s.safeEventSend(Event{
 				Type: "qr_code",
 				Data: map[string]interface{}{
-					"code":     qrData.Code,
-					"filename": qrData.Filename,
+					"code":       qrData.Code,
+					"image_data": qrData.ImageData,
 				},
 				Time: time.Now(),
 			})
@@ -254,30 +255,21 @@ func (s *Service) startPairing() error {
 }
 
 func (s *Service) handleQRCode(code string) QRCodeData {
-	// Delete old QR code files before creating new one
-	s.cleanupOldQRCodes()
-
-	// Ensure data/qr directory exists
-	qrDir := "data/qr"
-	os.MkdirAll(qrDir, 0755)
-
-	filename := filepath.Join(qrDir, fmt.Sprintf("qr_%d.png", time.Now().Unix()))
-
-	s.logger.Infof("Generating QR code PNG file: %s", filename)
+	s.logger.Info("Generating QR code as base64 PNG")
 	s.logger.Debugf("QR code content (first 50 chars): %s...", code[:min(50, len(code))])
 
-	// Save QR code as PNG
-	err := qrcode.WriteFile(code, qrcode.Medium, 256, filename)
+	// Generate PNG in memory (no file I/O)
+	png, err := qrcode.Encode(code, qrcode.Medium, 256)
 	if err != nil {
-		s.logger.Errorf("Failed to save QR code to file %s: %v", filename, err)
+		s.logger.Errorf("Failed to generate QR code PNG: %v", err)
 	} else {
-		s.logger.Infof("QR code successfully saved to %s", filename)
+		s.logger.Infof("QR code PNG generated successfully (%d bytes)", len(png))
 	}
 
 	qrData := QRCodeData{
-		Code:     code,
-		Filename: filename,
-		Time:     time.Now(),
+		Code:      code,
+		ImageData: base64.StdEncoding.EncodeToString(png),
+		Time:      time.Now(),
 	}
 
 	// Store QR code for API retrieval
@@ -290,8 +282,7 @@ func (s *Service) handleQRCode(code string) QRCodeData {
 	s.logger.Info("1. Open WhatsApp on your phone")
 	s.logger.Info("2. Go to Settings > Linked Devices")
 	s.logger.Info("3. Tap 'Link a Device'")
-	s.logger.Info("4. Scan the QR code from the generated PNG file or terminal")
-	s.logger.Infof("5. QR code file location: %s", filename)
+	s.logger.Info("4. Scan the QR code via the API or client application")
 
 	return qrData
 }
@@ -2101,30 +2092,7 @@ func (s *Service) reinitClient() error {
 	return nil
 }
 
-func (s *Service) cleanupOldQRCodes() {
-	s.CleanupQRCodes()
-}
-
-// CleanupQRCodes deletes all QR code PNG files
-func (s *Service) CleanupQRCodes() {
-	// Delete all old QR code PNG files
-	files, err := filepath.Glob("data/qr/qr_*.png")
-	if err != nil {
-		s.logger.Warnf("Failed to find old QR code files: %v", err)
-		return
-	}
-
-	if len(files) > 0 {
-		s.logger.Infof("Cleaning up %d old QR code file(s)", len(files))
-		for _, file := range files {
-			if err := os.Remove(file); err != nil {
-				s.logger.Warnf("Failed to delete old QR code file %s: %v", file, err)
-			} else {
-				s.logger.Debugf("Deleted old QR code file: %s", file)
-			}
-		}
-	}
-
-	// Clear cached QR code
+// ClearQRCode clears the cached QR code data
+func (s *Service) ClearQRCode() {
 	s.lastQRCode = nil
 }
