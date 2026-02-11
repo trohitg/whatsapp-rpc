@@ -175,7 +175,7 @@ async function clean(opts = {}) {
 // Global port option for all commands
 const portOption = ['-p, --port <port>', 'API port (default: 9400, or PORT/WHATSAPP_RPC_PORT env var)'];
 
-program.name('whatsapp-rpc').version('0.0.7');
+program.name('whatsapp-rpc').version('0.0.8');
 program.command('start').description('Start API server').option(...portOption).action(start);
 program.command('stop').description('Stop API server').option(...portOption).action(stop);
 program.command('restart').description('Restart API server').option(...portOption).action(async (opts) => { await stop(opts); await sleep(1000); await start(opts); });
