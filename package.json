@@ -44,8 +44,10 @@
     "status": "node scripts/cli.js status",
     "api": "node scripts/cli.js api --foreground",
     "web": "node scripts/cli.js web",
+    "prebuild": "node -e \"require('fs').existsSync('node_modules') || process.exit(1)\" || npm install",
     "build": "node scripts/cli.js build",
-    "clean": "node scripts/clean.cjs"
+    "preclean": "node -e \"require('fs').existsSync('node_modules') || process.exit(1)\" || npm install",
+    "clean": "node scripts/cli.js clean"
   },
   "dependencies": {
     "chalk": "^5.3.0",

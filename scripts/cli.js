@@ -5,7 +5,7 @@ import { execa } from 'execa';
 import killPort from 'kill-port';
 import { Socket } from 'net';
 import { execSync, spawn } from 'child_process';
-import { existsSync, statSync, mkdirSync } from 'fs';
+import { existsSync, statSync, mkdirSync, rmSync, readdirSync, unlinkSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -129,6 +129,49 @@ async function build() {
   log(`Built: ${BIN} (${(statSync(bin).size / 1024 / 1024).toFixed(1)}MB)`, 'green');
 }
 
+async function clean(opts = {}) {
+  const port = getPort(opts);
+
+  // Stop API server
+  log('Stopping API server...', 'blue');
+  await kill(port, 'API');
+
+  // Remove bin directory
+  if (existsSync(BIN_DIR)) {
+    rmSync(BIN_DIR, { recursive: true });
+    log('Removed bin/', 'green');
+  }
+
+  // Remove data directory
+  const dataDir = join(ROOT, 'data');
+  if (existsSync(dataDir)) {
+    rmSync(dataDir, { recursive: true });
+    log('Removed data/', 'green');
+  }
+
+  // Remove any .db files in project root (legacy locations)
+  readdirSync(ROOT).filter(f => f.endsWith('.db') || f.endsWith('.db-wal') || f.endsWith('.db-shm')).forEach(f => {
+    unlinkSync(join(ROOT, f));
+    log(`Removed ${f}`, 'green');
+  });
+
+  // Remove node_modules
+  const nodeModules = join(ROOT, 'node_modules');
+  if (existsSync(nodeModules)) {
+    rmSync(nodeModules, { recursive: true });
+    log('Removed node_modules/', 'green');
+  }
+
+  // Remove package-lock.json
+  const lockFile = join(ROOT, 'package-lock.json');
+  if (existsSync(lockFile)) {
+    unlinkSync(lockFile);
+    log('Removed package-lock.json', 'green');
+  }
+
+  log('Clean complete', 'green');
+}
+
 // Global port option for all commands
 const portOption = ['-p, --port <port>', 'API port (default: 9400, or PORT/WHATSAPP_RPC_PORT env var)'];
 
@@ -139,4 +182,5 @@ program.command('restart').description('Restart API server').option(...portOptio
 program.command('status').description('Show server status').option(...portOption).action(status);
 program.command('api').description('Start API server').option('-f, --foreground', 'Run in foreground').option(...portOption).action(api);
 program.command('build').description('Build binary from source (requires Go)').action(build);
+program.command('clean').description('Full cleanup (stop server, remove bin/, data/, node_modules/)').action(clean);
 program.parse();

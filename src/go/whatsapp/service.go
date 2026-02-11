@@ -298,9 +298,13 @@ func (s *Service) eventHandler(evt interface{}) {
 		s.logger.Infof("Successfully connected to WhatsApp! Device ID: %s", s.client.Store.ID.String())
 		s.pairing = false
 
-		// Generate groups JSON file asynchronously
+		// Refresh groups cache asynchronously on connection
 		go func() {
 			time.Sleep(2 * time.Second) // Wait for connection to stabilize
+			if _, err := s.GetGroups(true); err != nil {
+				s.logger.Errorf("Failed to refresh groups cache: %v", err)
+			}
+			// Also generate groups.json for backwards compatibility
 			if err := s.generateGroupsJSON(); err != nil {
 				s.logger.Errorf("Failed to generate groups.json: %v", err)
 			}
@@ -1120,8 +1124,17 @@ func (s *Service) generateGroupsJSON() error {
 	return nil
 }
 
-// GetGroups returns all groups the user is a member of
-func (s *Service) GetGroups() ([]GroupInfo, error) {
+// GetGroups returns all groups the user is a member of (cache-first with refresh option)
+func (s *Service) GetGroups(refresh bool) ([]GroupInfo, error) {
+	// Try cache first (if not forcing refresh)
+	if !refresh && s.historyStore != nil {
+		if cached, err := s.historyStore.GetCachedGroups(); err == nil && len(cached) > 0 {
+			s.logger.Debugf("Returning %d groups from cache", len(cached))
+			return cached, nil
+		}
+	}
+
+	// Fetch from WhatsApp API
 	if !s.client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp not connected")
 	}
@@ -1161,12 +1174,30 @@ func (s *Service) GetGroups() ([]GroupInfo, error) {
 		})
 	}
 
-	s.logger.Infof("Retrieved %d groups", len(result))
+	// Store in cache
+	if s.historyStore != nil {
+		if err := s.historyStore.StoreGroups(result); err != nil {
+			s.logger.Warnf("Failed to cache groups: %v", err)
+		} else {
+			s.logger.Debugf("Cached %d groups", len(result))
+		}
+	}
+
+	s.logger.Infof("Retrieved %d groups from WhatsApp", len(result))
 	return result, nil
 }
 
-// GetGroupInfo returns detailed information about a specific group
-func (s *Service) GetGroupInfo(groupJID string) (*GroupInfo, error) {
+// GetGroupInfo returns detailed information about a specific group (cache-first with refresh option)
+func (s *Service) GetGroupInfo(groupJID string, refresh bool) (*GroupInfo, error) {
+	// Try cache first (if not forcing refresh)
+	if !refresh && s.historyStore != nil {
+		if cached, err := s.historyStore.GetCachedGroupByJID(groupJID); err == nil {
+			s.logger.Debugf("Returning group %s from cache", groupJID)
+			return cached, nil
+		}
+	}
+
+	// Fetch from WhatsApp API
 	if !s.client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp not connected")
 	}
@@ -1208,7 +1239,7 @@ func (s *Service) GetGroupInfo(groupJID string) (*GroupInfo, error) {
 		IsCommunity:  info.IsParent,
 	}
 
-	s.logger.Infof("Retrieved info for group %s (%s)", info.Name, groupJID)
+	s.logger.Infof("Retrieved info for group %s (%s) from WhatsApp", info.Name, groupJID)
 	return result, nil
 }
 
@@ -1250,8 +1281,27 @@ func (s *Service) UpdateGroupInfo(groupJID, name, topic string) error {
 	return nil
 }
 
-// CheckContacts checks if phone numbers are registered on WhatsApp
-func (s *Service) CheckContacts(phones []string) ([]ContactCheckResult, error) {
+// CheckContacts checks if phone numbers are registered on WhatsApp (cache-first with 24h TTL)
+func (s *Service) CheckContacts(phones []string, refresh bool) ([]ContactCheckResult, error) {
+	const cacheTTLHours = 24
+
+	// Try cache first (if not forcing refresh)
+	if !refresh && s.historyStore != nil {
+		cached, _ := s.historyStore.GetCachedContactChecks(phones, cacheTTLHours)
+		if len(cached) == len(phones) {
+			// All results found in cache
+			response := make([]ContactCheckResult, 0, len(phones))
+			for _, phone := range phones {
+				if result, ok := cached[phone]; ok {
+					response = append(response, *result)
+				}
+			}
+			s.logger.Debugf("Returning %d contact checks from cache", len(response))
+			return response, nil
+		}
+	}
+
+	// Fetch from WhatsApp API
 	if !s.client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp not connected")
 	}
@@ -1279,7 +1329,14 @@ func (s *Service) CheckContacts(phones []string) ([]ContactCheckResult, error) {
 		response = append(response, result)
 	}
 
-	s.logger.Infof("Checked %d phone numbers, %d registered", len(phones), countRegistered(response))
+	// Store in cache
+	if s.historyStore != nil {
+		if err := s.historyStore.StoreContactChecks(response); err != nil {
+			s.logger.Warnf("Failed to cache contact checks: %v", err)
+		}
+	}
+
+	s.logger.Infof("Checked %d phone numbers from WhatsApp, %d registered", len(phones), countRegistered(response))
 	return response, nil
 }
 
@@ -1293,8 +1350,19 @@ func countRegistered(results []ContactCheckResult) int {
 	return count
 }
 
-// GetProfilePicture gets profile picture for a JID
-func (s *Service) GetProfilePicture(jidStr string, preview bool) (*ProfilePicResult, error) {
+// GetProfilePicture gets profile picture for a JID (cache-first with 24h TTL)
+func (s *Service) GetProfilePicture(jidStr string, preview bool, refresh bool) (*ProfilePicResult, error) {
+	const cacheTTLHours = 24
+
+	// Try cache first (if not forcing refresh)
+	if !refresh && s.historyStore != nil {
+		if cached, err := s.historyStore.GetCachedProfilePic(jidStr, cacheTTLHours); err == nil {
+			s.logger.Debugf("Returning profile picture for %s from cache", jidStr)
+			return cached, nil
+		}
+	}
+
+	// Fetch from WhatsApp API
 	if !s.client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp not connected")
 	}
@@ -1314,7 +1382,12 @@ func (s *Service) GetProfilePicture(jidStr string, preview bool) (*ProfilePicRes
 		// Profile picture may not exist - this is not an error
 		errStr := err.Error()
 		if strings.Contains(errStr, "item-not-found") || strings.Contains(errStr, "not-authorized") {
-			return &ProfilePicResult{Exists: false}, nil
+			result := &ProfilePicResult{Exists: false}
+			// Cache the "no picture" result too
+			if s.historyStore != nil {
+				s.historyStore.StoreProfilePic(jidStr, *result)
+			}
+			return result, nil
 		}
 		s.logger.Errorf("Failed to get profile picture for %s: %v", jidStr, err)
 		return nil, fmt.Errorf("failed to get profile picture: %w", err)
@@ -1326,7 +1399,14 @@ func (s *Service) GetProfilePicture(jidStr string, preview bool) (*ProfilePicRes
 		ID:     info.ID,
 	}
 
-	s.logger.Infof("Retrieved profile picture for %s", jidStr)
+	// Store in cache
+	if s.historyStore != nil {
+		if err := s.historyStore.StoreProfilePic(jidStr, *result); err != nil {
+			s.logger.Warnf("Failed to cache profile picture: %v", err)
+		}
+	}
+
+	s.logger.Infof("Retrieved profile picture for %s from WhatsApp", jidStr)
 	return result, nil
 }
 
@@ -1578,8 +1658,23 @@ func (s *Service) RemoveGroupParticipants(groupJID string, participants []string
 	return response, nil
 }
 
-// GetGroupInviteLink gets the invite link for a group
-func (s *Service) GetGroupInviteLink(groupJID string) (*GroupInviteLinkResult, error) {
+// GetGroupInviteLink gets the invite link for a group (cache-first with 1h TTL)
+func (s *Service) GetGroupInviteLink(groupJID string, refresh bool) (*GroupInviteLinkResult, error) {
+	const cacheTTLHours = 1 // Short TTL since links can be revoked
+
+	// Try cache first (if not forcing refresh)
+	if !refresh && s.historyStore != nil {
+		if link, err := s.historyStore.GetCachedGroupInviteLink(groupJID, cacheTTLHours); err == nil && link != "" {
+			s.logger.Debugf("Returning invite link for %s from cache", groupJID)
+			return &GroupInviteLinkResult{
+				GroupID:    groupJID,
+				InviteLink: link,
+				Revoked:    false,
+			}, nil
+		}
+	}
+
+	// Fetch from WhatsApp API
 	if !s.client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp not connected")
 	}
@@ -1596,7 +1691,14 @@ func (s *Service) GetGroupInviteLink(groupJID string) (*GroupInviteLinkResult, e
 		return nil, fmt.Errorf("failed to get invite link: %w", err)
 	}
 
-	s.logger.Infof("Retrieved invite link for group %s", groupJID)
+	// Store in cache
+	if s.historyStore != nil {
+		if err := s.historyStore.StoreGroupInviteLink(groupJID, link); err != nil {
+			s.logger.Warnf("Failed to cache invite link: %v", err)
+		}
+	}
+
+	s.logger.Infof("Retrieved invite link for group %s from WhatsApp", groupJID)
 	return &GroupInviteLinkResult{
 		GroupID:    groupJID,
 		InviteLink: link,
@@ -1621,6 +1723,11 @@ func (s *Service) RevokeGroupInviteLink(groupJID string) (*GroupInviteLinkResult
 	if err != nil {
 		s.logger.Errorf("Failed to revoke invite link for %s: %v", groupJID, err)
 		return nil, fmt.Errorf("failed to revoke invite link: %w", err)
+	}
+
+	// Update cache with new link
+	if s.historyStore != nil {
+		s.historyStore.StoreGroupInviteLink(groupJID, link)
 	}
 
 	s.logger.Infof("Revoked and regenerated invite link for group %s", groupJID)

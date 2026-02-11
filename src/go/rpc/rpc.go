@@ -121,7 +121,11 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 		}
 
 	case "groups":
-		if groups, err := h.service.GetGroups(); err != nil {
+		var p struct {
+			Refresh bool `json:"refresh"` // Optional: force refresh from WhatsApp API
+		}
+		json.Unmarshal(req.Params, &p) // Ignore error, defaults to false
+		if groups, err := h.service.GetGroups(p.Refresh); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else {
 			resp.Result = groups
@@ -130,12 +134,13 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 	case "group_info":
 		var p struct {
 			GroupID string `json:"group_id"`
+			Refresh bool   `json:"refresh"` // Optional: force refresh from WhatsApp API
 		}
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			resp.Error = &RPCError{Code: -32602, Message: "Invalid params: " + err.Error()}
 		} else if p.GroupID == "" {
 			resp.Error = &RPCError{Code: -32602, Message: "group_id is required"}
-		} else if info, err := h.service.GetGroupInfo(p.GroupID); err != nil {
+		} else if info, err := h.service.GetGroupInfo(p.GroupID, p.Refresh); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else {
 			resp.Result = info
@@ -157,13 +162,14 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 
 	case "contact_check":
 		var p struct {
-			Phones []string `json:"phones"`
+			Phones  []string `json:"phones"`
+			Refresh bool     `json:"refresh"` // Optional: force refresh from WhatsApp API
 		}
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			resp.Error = &RPCError{Code: -32602, Message: "Invalid params: " + err.Error()}
 		} else if len(p.Phones) == 0 {
 			resp.Error = &RPCError{Code: -32602, Message: "phones array is required and must not be empty"}
-		} else if results, err := h.service.CheckContacts(p.Phones); err != nil {
+		} else if results, err := h.service.CheckContacts(p.Phones, p.Refresh); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else {
 			resp.Result = results
@@ -173,12 +179,13 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 		var p struct {
 			JID     string `json:"jid"`
 			Preview bool   `json:"preview"`
+			Refresh bool   `json:"refresh"` // Optional: force refresh from WhatsApp API
 		}
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			resp.Error = &RPCError{Code: -32602, Message: "Invalid params: " + err.Error()}
 		} else if p.JID == "" {
 			resp.Error = &RPCError{Code: -32602, Message: "jid is required"}
-		} else if result, err := h.service.GetProfilePicture(p.JID, p.Preview); err != nil {
+		} else if result, err := h.service.GetProfilePicture(p.JID, p.Preview, p.Refresh); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else {
 			resp.Result = result
@@ -302,12 +309,13 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 	case "group_invite_link":
 		var p struct {
 			GroupID string `json:"group_id"`
+			Refresh bool   `json:"refresh"` // Optional: force refresh from WhatsApp API
 		}
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			resp.Error = &RPCError{Code: -32602, Message: "Invalid params: " + err.Error()}
 		} else if p.GroupID == "" {
 			resp.Error = &RPCError{Code: -32602, Message: "group_id is required"}
-		} else if result, err := h.service.GetGroupInviteLink(p.GroupID); err != nil {
+		} else if result, err := h.service.GetGroupInviteLink(p.GroupID, p.Refresh); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else {
 			resp.Result = result

@@ -240,7 +240,15 @@
     {
       "name": "groups",
       "summary": "List all groups the user is a member of",
-      "params": [],
+      "description": "Returns cached groups by default. Use refresh=true to fetch fresh data from WhatsApp (may trigger rate limits).",
+      "params": [
+        {
+          "name": "refresh",
+          "description": "Force refresh from WhatsApp API instead of cache (default: false)",
+          "schema": { "type": "boolean", "default": false },
+          "required": false
+        }
+      ],
       "result": {
         "name": "GroupsResult",
         "schema": {
@@ -252,12 +260,19 @@
     {
       "name": "group_info",
       "summary": "Get detailed information about a specific group",
+      "description": "Returns cached group info by default. Use refresh=true to fetch fresh data from WhatsApp.",
       "params": [
         {
           "name": "group_id",
           "description": "Group JID (e.g., 123456789@g.us)",
           "schema": { "type": "string" },
           "required": true
+        },
+        {
+          "name": "refresh",
+          "description": "Force refresh from WhatsApp API instead of cache (default: false)",
+          "schema": { "type": "boolean", "default": false },
+          "required": false
         }
       ],
       "result": {
@@ -301,12 +316,19 @@
     {
       "name": "contact_check",
       "summary": "Check if phone numbers are registered on WhatsApp",
+      "description": "Returns cached results (24h TTL) by default. Use refresh=true to force fresh check from WhatsApp.",
       "params": [
         {
           "name": "phones",
           "description": "Array of phone numbers to check (without + prefix)",
           "schema": { "type": "array", "items": { "type": "string" } },
           "required": true
+        },
+        {
+          "name": "refresh",
+          "description": "Force refresh from WhatsApp API instead of cache (default: false)",
+          "schema": { "type": "boolean", "default": false },
+          "required": false
         }
       ],
       "result": {
@@ -330,6 +352,7 @@
     {
       "name": "contact_profile_pic",
       "summary": "Get profile picture for a user or group",
+      "description": "Returns cached result (24h TTL) by default. Use refresh=true to force fresh fetch from WhatsApp.",
       "params": [
         {
           "name": "jid",
@@ -341,6 +364,12 @@
           "name": "preview",
           "description": "Get smaller preview image",
           "schema": { "type": "boolean" },
+          "required": false
+        },
+        {
+          "name": "refresh",
+          "description": "Force refresh from WhatsApp API instead of cache (default: false)",
+          "schema": { "type": "boolean", "default": false },
           "required": false
         }
       ],
@@ -558,12 +587,19 @@
     {
       "name": "group_invite_link",
       "summary": "Get group invite link",
+      "description": "Returns cached invite link (1h TTL) by default. Use refresh=true to force fresh fetch from WhatsApp.",
       "params": [
         {
           "name": "group_id",
           "description": "Group JID",
           "schema": { "type": "string" },
           "required": true
+        },
+        {
+          "name": "refresh",
+          "description": "Force refresh from WhatsApp API instead of cache (default: false)",
+          "schema": { "type": "boolean", "default": false },
+          "required": false
         }
       ],
       "result": {
