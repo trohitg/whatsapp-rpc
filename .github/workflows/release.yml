@@ -114,6 +114,12 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Sync version from git tag
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          echo "Set package.json version to $VERSION"
+
       - name: Install dependencies
         run: npm install --ignore-scripts
 
@@ -142,15 +148,18 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@trohitg'
 
-      - name: Configure package for GitHub Packages
+      - name: Sync version from git tag and configure for GitHub Packages
         run: |
+          VERSION=${GITHUB_REF_NAME#v}
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$VERSION';
             pkg.name = '@trohitg/whatsapp-rpc';
             pkg.publishConfig = { registry: 'https://npm.pkg.github.com' };
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
+          echo "Set package.json version to $VERSION"
 
       - name: Install dependencies
         run: npm install --ignore-scripts
@@ -177,6 +186,14 @@ jobs:
 
       - name: Install build tools
         run: pip install build twine
+
+      - name: Sync version from git tag
+        working-directory: src/python
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
+          echo "Set pyproject.toml version to $VERSION"
+          grep "^version" pyproject.toml
 
       - name: Build package
         working-directory: src/python
