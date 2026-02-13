@@ -5,7 +5,6 @@
  *
  * Skip conditions:
  * - WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD=1
- * - CI=true (CI environments skip download)
  * - Binary already exists
  * - Go is installed and WHATSAPP_RPC_PREFER_SOURCE=1
  */
@@ -125,11 +124,6 @@ async function main() {
   // Skip conditions
   if (process.env.WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD === '1') {
     console.log('[whatsapp-rpc] Skipping binary download (WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD=1)');
-    return;
-  }
-
-  if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
-    console.log('[whatsapp-rpc] Skipping binary download (CI environment)');
     return;
   }
 
