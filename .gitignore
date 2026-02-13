@@ -32,5 +32,4 @@ Thumbs.db
 *.log
 
 # Claude
-CLAUDE.md
 .claude/

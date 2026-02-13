@@ -5,12 +5,13 @@ import { execa } from 'execa';
 import killPort from 'kill-port';
 import { Socket } from 'net';
 import { execSync, spawn } from 'child_process';
-import { existsSync, statSync, mkdirSync, rmSync, readdirSync, unlinkSync } from 'fs';
+import { existsSync, statSync, mkdirSync, rmSync, readdirSync, unlinkSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const DEFAULT_PORT = 9400;
 const BIN = process.platform === 'win32' ? 'whatsapp-rpc-server.exe' : 'whatsapp-rpc-server';
 const BIN_DIR = join(ROOT, 'bin');
@@ -175,7 +176,7 @@ async function clean(opts = {}) {
 // Global port option for all commands
 const portOption = ['-p, --port <port>', 'API port (default: 9400, or PORT/WHATSAPP_RPC_PORT env var)'];
 
-program.name('whatsapp-rpc').version('0.0.8');
+program.name('whatsapp-rpc').version(pkg.version);
 program.command('start').description('Start API server').option(...portOption).action(start);
 program.command('stop').description('Stop API server').option(...portOption).action(stop);
 program.command('restart').description('Restart API server').option(...portOption).action(async (opts) => { await stop(opts); await sleep(1000); await start(opts); });

@@ -2120,6 +2120,9 @@ func (s *Service) Shutdown() {
 func (s *Service) Reset() error {
 	s.logger.Info("Starting full reset with logout...")
 
+	// Check if Store.ID exists before any operations (needed for delete)
+	hasDeviceID := s.client != nil && s.client.Store != nil && s.client.Store.ID != nil
+
 	// Logout from WhatsApp servers first (invalidates session on server side)
 	if s.client != nil && s.client.IsLoggedIn() {
 		s.logger.Info("Logging out from WhatsApp...")
@@ -2130,16 +2133,21 @@ func (s *Service) Reset() error {
 		}
 	}
 
-	// Shutdown the service (disconnect, close channels)
-	s.Shutdown()
-
-	// Delete the device session from store
-	if s.client != nil && s.client.Store != nil {
+	// Delete the device session from store BEFORE shutdown
+	// Must be done while Store.ID is still known
+	if hasDeviceID && s.client != nil && s.client.Store != nil {
 		s.logger.Info("Deleting device session from store...")
 		if err := s.client.Store.Delete(context.Background()); err != nil {
 			s.logger.Warnf("Failed to delete device store: %v", err)
+		} else {
+			s.logger.Info("Device session deleted successfully")
 		}
+	} else {
+		s.logger.Info("No device session to delete (not connected)")
 	}
+
+	// Shutdown the service (disconnect, drain events)
+	s.Shutdown()
 
 	// Clear message history (belongs to old instance)
 	if s.historyStore != nil {
