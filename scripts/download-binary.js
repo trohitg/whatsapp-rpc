@@ -6,9 +6,7 @@
  * Skip conditions:
  * - WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD=1
  * - Binary already exists
- * - Go is installed and WHATSAPP_RPC_PREFER_SOURCE=1
  */
-import { execSync } from 'child_process';
 import { createWriteStream, existsSync, mkdirSync, chmodSync, readFileSync, unlinkSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -41,16 +39,6 @@ function getPlatformInfo() {
 
   const ext = process.platform === 'win32' ? '.exe' : '';
   return { os, goarch, ext };
-}
-
-// Check if Go is installed
-function hasGo() {
-  try {
-    execSync('go version', { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // Download file with redirect handling
@@ -121,7 +109,7 @@ function downloadFile(url, dest) {
 
 // Main
 async function main() {
-  // Skip conditions
+  // Skip if explicitly disabled
   if (process.env.WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD === '1') {
     console.log('[whatsapp-rpc] Skipping binary download (WHATSAPP_RPC_SKIP_BINARY_DOWNLOAD=1)');
     return;
@@ -129,9 +117,8 @@ async function main() {
 
   const platformInfo = getPlatformInfo();
   if (!platformInfo) {
-    console.log(`[whatsapp-rpc] Unsupported platform: ${process.platform}/${process.arch}`);
-    console.log('[whatsapp-rpc] Please build from source: npm run build');
-    return;
+    console.error(`[whatsapp-rpc] Unsupported platform: ${process.platform}/${process.arch}`);
+    process.exit(1);
   }
 
   const { os, goarch, ext } = platformInfo;
@@ -145,13 +132,6 @@ async function main() {
     return;
   }
 
-  // Check if Go is installed and user prefers source
-  if (hasGo() && process.env.WHATSAPP_RPC_PREFER_SOURCE === '1') {
-    console.log('[whatsapp-rpc] Go is installed and WHATSAPP_RPC_PREFER_SOURCE=1, skipping download');
-    console.log('[whatsapp-rpc] Build from source with: npm run build');
-    return;
-  }
-
   console.log(`[whatsapp-rpc] Downloading pre-built binary...`);
   console.log(`  Version: v${VERSION}`);
   console.log(`  Platform: ${os}/${goarch}`);
@@ -162,18 +142,7 @@ async function main() {
   }
 
   // Download binary
-  try {
-    await downloadFile(downloadUrl, destPath);
-  } catch (error) {
-    console.error(`\n[whatsapp-rpc] Failed to download binary: ${error.message}`);
-
-    if (hasGo()) {
-      console.log('[whatsapp-rpc] Go is installed - you can build from source: npm run build');
-    } else {
-      console.log('[whatsapp-rpc] Install Go to build from source: https://go.dev/dl/');
-    }
-    return;
-  }
+  await downloadFile(downloadUrl, destPath);
 
   // Set executable permission (Unix only)
   if (process.platform !== 'win32') {
@@ -188,8 +157,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // Don't fail npm install - just log and continue
-  console.error('[whatsapp-rpc] Binary download error:', err.message);
-  console.log('[whatsapp-rpc] WhatsApp features will not work until binary is available.');
-  console.log('[whatsapp-rpc] Build from source with: npm run build');
+  console.error('[whatsapp-rpc] Binary download failed:', err.message);
+  process.exit(1);
 });

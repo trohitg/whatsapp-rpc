@@ -59,16 +59,8 @@ async function api(opts = {}) {
   if (await portUp(port)) { log(`API already running on port ${port}`, 'yellow'); return; }
   const bin = join(BIN_DIR, BIN);
   if (!existsSync(bin)) {
-    if (!hasGo()) {
-      log('Binary not found and Go is not installed.', 'red');
-      log('Options:', 'yellow');
-      log('  1. Run: npm run postinstall (download pre-built binary)', 'yellow');
-      log('  2. Install Go and run: npm run build', 'yellow');
-      log('  3. Copy pre-built binary to: ' + bin, 'yellow');
-      process.exit(1);
-    }
-    log('Binary not found, building from source...', 'yellow');
-    await build();
+    log('Binary not found. Run: npm run postinstall', 'red');
+    process.exit(1);
   }
 
   // Pass port to Go binary via environment variable
@@ -113,10 +105,7 @@ async function build() {
 
   // Build from source requires Go
   if (!hasGo()) {
-    log('Go is not installed and no pre-built binary found.', 'red');
-    log('Options:', 'yellow');
-    log('  1. Run: npm run postinstall (download pre-built binary)', 'yellow');
-    log('  2. Install Go from: https://go.dev/dl/', 'yellow');
+    log('Go is not installed. Install from: https://go.dev/dl/', 'red');
     process.exit(1);
   }
 
