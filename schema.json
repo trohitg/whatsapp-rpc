@@ -2,7 +2,7 @@
   "openrpc": "1.3.2",
   "info": {
     "title": "WhatsApp RPC API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "JSON-RPC 2.0 API over WebSocket for WhatsApp messaging"
   },
   "servers": [
@@ -1227,7 +1227,8 @@
           "created_at": { "type": "string", "format": "date-time" },
           "size": { "type": "integer", "description": "Number of participants" },
           "is_announce": { "type": "boolean", "description": "Only admins can send messages" },
-          "is_locked": { "type": "boolean", "description": "Only admins can edit group info" }
+          "is_locked": { "type": "boolean", "description": "Only admins can edit group info" },
+          "is_community": { "type": "boolean", "description": "Whether this is a community group" }
         },
         "required": ["jid", "name", "owner", "participants", "size"]
       },
@@ -1526,6 +1527,7 @@
           "params": {
             "message_id": { "type": "string" },
             "sender": { "type": "string", "description": "Sender JID" },
+            "sender_phone": { "type": "string", "description": "Sender phone number (extracted from JID)" },
             "chat_id": { "type": "string", "description": "Chat JID (same as sender for DMs, group JID for groups)" },
             "timestamp": { "type": "string", "format": "date-time" },
             "is_from_me": { "type": "boolean" },
@@ -1555,7 +1557,16 @@
               "properties": {
                 "group_jid": { "type": "string" },
                 "sender_jid": { "type": "string" },
+                "sender_phone": { "type": "string" },
                 "sender_name": { "type": "string" }
+              }
+            },
+            "newsletter_meta": {
+              "type": "object",
+              "description": "Present for newsletter messages",
+              "properties": {
+                "edit_ts": { "type": "string", "format": "date-time" },
+                "original_ts": { "type": "string", "format": "date-time" }
               }
             },
             "is_reply": { "type": "boolean" },
@@ -1611,161 +1622,994 @@
     }
   },
   "examples": {
-    "request": {
-      "description": "JSON-RPC 2.0 request format",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "status",
-        "params": {}
-      }
-    },
-    "response": {
-      "description": "JSON-RPC 2.0 response format",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "connected": true,
-          "has_session": true,
-          "running": true,
-          "pairing": false,
-          "device_id": "1234567890@s.whatsapp.net",
-          "timestamp": "2025-01-15T10:30:00Z"
+    "connection": {
+      "status": {
+        "request": { "jsonrpc": "2.0", "id": 1, "method": "status", "params": {} },
+        "response": {
+          "jsonrpc": "2.0", "id": 1,
+          "result": {
+            "connected": true,
+            "has_session": true,
+            "running": true,
+            "pairing": false,
+            "device_id": "919876543210:25@s.whatsapp.net",
+            "timestamp": "2026-02-26T10:30:00Z"
+          }
+        }
+      },
+      "start": {
+        "request": { "jsonrpc": "2.0", "id": 2, "method": "start", "params": {} },
+        "response": { "jsonrpc": "2.0", "id": 2, "result": { "message": "Started" } }
+      },
+      "stop": {
+        "request": { "jsonrpc": "2.0", "id": 3, "method": "stop", "params": {} },
+        "response": { "jsonrpc": "2.0", "id": 3, "result": { "message": "Stopped" } }
+      },
+      "restart": {
+        "request": { "jsonrpc": "2.0", "id": 4, "method": "restart", "params": {} },
+        "response": { "jsonrpc": "2.0", "id": 4, "result": { "message": "Restarted (session cleared)" } }
+      },
+      "reset": {
+        "request": { "jsonrpc": "2.0", "id": 5, "method": "reset", "params": {} },
+        "response": { "jsonrpc": "2.0", "id": 5, "result": { "message": "Reset" } }
+      },
+      "diagnostics": {
+        "request": { "jsonrpc": "2.0", "id": 6, "method": "diagnostics", "params": {} },
+        "response": {
+          "jsonrpc": "2.0", "id": 6,
+          "result": {
+            "client_connected": true,
+            "client_logged_in": true,
+            "store_has_id": true,
+            "service_running": true,
+            "service_pairing": false,
+            "service_shutdown": false,
+            "events_channel_open": true,
+            "device_store": {
+              "device_id": "919876543210:25@s.whatsapp.net",
+              "user": "919876543210",
+              "device": 25,
+              "server": "s.whatsapp.net"
+            },
+            "timestamp": "2026-02-26T10:30:00Z"
+          }
+        }
+      },
+      "qr": {
+        "request": { "jsonrpc": "2.0", "id": 7, "method": "qr", "params": {} },
+        "response": {
+          "jsonrpc": "2.0", "id": 7,
+          "result": {
+            "has_qr": true,
+            "code": "2@abc123def456,ghi789jkl012,mno345pqr678",
+            "image_data": "iVBORw0KGgoAAAANSUhEUgAA..."
+          }
         }
       }
     },
-    "event": {
-      "description": "JSON-RPC 2.0 notification (no id)",
-      "value": {
+    "messaging": {
+      "send_text": {
+        "request": {
+          "jsonrpc": "2.0", "id": 10, "method": "send",
+          "params": { "phone": "1234567890", "type": "text", "message": "Hello from API!" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 10, "result": { "message": "Sent" } }
+      },
+      "send_image": {
+        "request": {
+          "jsonrpc": "2.0", "id": 11, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "image",
+            "media_data": {
+              "data": "iVBORw0KGgoAAAANSUhEUgAA...",
+              "mime_type": "image/jpeg",
+              "caption": "Check this out!"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 11, "result": { "message": "Sent" } }
+      },
+      "send_video": {
+        "request": {
+          "jsonrpc": "2.0", "id": 12, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "video",
+            "media_data": {
+              "data": "AAAAIGZ0eXBpc29t...",
+              "mime_type": "video/mp4",
+              "caption": "Watch this"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 12, "result": { "message": "Sent" } }
+      },
+      "send_audio": {
+        "request": {
+          "jsonrpc": "2.0", "id": 13, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "audio",
+            "media_data": {
+              "data": "SUQzBAAAAAAAI1RTU0UAAAA...",
+              "mime_type": "audio/mp3"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 13, "result": { "message": "Sent" } }
+      },
+      "send_document": {
+        "request": {
+          "jsonrpc": "2.0", "id": 14, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "document",
+            "media_data": {
+              "data": "JVBERi0xLjQKJeLjz9MKN...",
+              "mime_type": "application/pdf",
+              "filename": "report.pdf",
+              "caption": "Monthly report"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 14, "result": { "message": "Sent" } }
+      },
+      "send_sticker": {
+        "request": {
+          "jsonrpc": "2.0", "id": 15, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "sticker",
+            "media_data": {
+              "data": "UklGRlYAAABXRUJQVlA4...",
+              "mime_type": "image/webp"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 15, "result": { "message": "Sent" } }
+      },
+      "send_location": {
+        "request": {
+          "jsonrpc": "2.0", "id": 16, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "location",
+            "location": {
+              "latitude": 37.7749,
+              "longitude": -122.4194,
+              "name": "San Francisco",
+              "address": "California, USA"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 16, "result": { "message": "Sent" } }
+      },
+      "send_contact": {
+        "request": {
+          "jsonrpc": "2.0", "id": 17, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "contact",
+            "contact": {
+              "display_name": "John Doe",
+              "vcard": "BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nTEL;type=CELL:+1234567890\nEND:VCARD"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 17, "result": { "message": "Sent" } }
+      },
+      "send_to_group": {
+        "request": {
+          "jsonrpc": "2.0", "id": 18, "method": "send",
+          "params": { "group_id": "120363012345678901@g.us", "type": "text", "message": "Hello group!" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 18, "result": { "message": "Sent" } }
+      },
+      "send_reply": {
+        "request": {
+          "jsonrpc": "2.0", "id": 19, "method": "send",
+          "params": {
+            "phone": "1234567890",
+            "type": "text",
+            "message": "This is a reply!",
+            "reply": {
+              "message_id": "3EB0A0B12F4A7C",
+              "sender": "1234567890@s.whatsapp.net",
+              "content": "Original message text"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 19, "result": { "message": "Sent" } }
+      },
+      "download_media": {
+        "request": {
+          "jsonrpc": "2.0", "id": 20, "method": "media",
+          "params": { "message_id": "3EB0A0B12F4A7C" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 20,
+          "result": {
+            "data": "iVBORw0KGgoAAAANSUhEUgAA...",
+            "mime_type": "image/jpeg"
+          }
+        }
+      },
+      "typing": {
+        "request": {
+          "jsonrpc": "2.0", "id": 21, "method": "typing",
+          "params": { "jid": "1234567890@s.whatsapp.net", "state": "composing" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 21, "result": { "message": "Typing indicator sent" } }
+      },
+      "presence": {
+        "request": {
+          "jsonrpc": "2.0", "id": 22, "method": "presence",
+          "params": { "status": "available" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 22, "result": { "message": "Presence set" } }
+      },
+      "mark_read": {
+        "request": {
+          "jsonrpc": "2.0", "id": 23, "method": "mark_read",
+          "params": {
+            "message_ids": ["3EB0A0B12F4A7C", "3EB0A0B12F4A7D"],
+            "chat_jid": "1234567890@s.whatsapp.net"
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 23, "result": { "message": "Messages marked as read" } }
+      }
+    },
+    "contacts": {
+      "contacts_list": {
+        "request": {
+          "jsonrpc": "2.0", "id": 30, "method": "contacts",
+          "params": { "query": "john" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 30,
+          "result": {
+            "contacts": [
+              {
+                "jid": "1234567890@s.whatsapp.net",
+                "phone": "1234567890",
+                "name": "John Doe",
+                "push_name": "Johnny",
+                "is_contact": true
+              }
+            ],
+            "total": 1
+          }
+        }
+      },
+      "contact_info": {
+        "request": {
+          "jsonrpc": "2.0", "id": 31, "method": "contact_info",
+          "params": { "phone": "1234567890" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 31,
+          "result": {
+            "jid": "1234567890@s.whatsapp.net",
+            "phone": "1234567890",
+            "name": "John Doe",
+            "push_name": "Johnny",
+            "business_name": "",
+            "is_business": false,
+            "is_contact": true,
+            "profile_pic": "https://pps.whatsapp.net/v/t61.24694-24/..."
+          }
+        }
+      },
+      "contact_check": {
+        "request": {
+          "jsonrpc": "2.0", "id": 32, "method": "contact_check",
+          "params": { "phones": ["1234567890", "9876543210"] }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 32,
+          "result": [
+            {
+              "query": "1234567890",
+              "jid": "1234567890@s.whatsapp.net",
+              "is_registered": true,
+              "is_business": false,
+              "business_name": ""
+            },
+            {
+              "query": "9876543210",
+              "jid": "",
+              "is_registered": false,
+              "is_business": false,
+              "business_name": ""
+            }
+          ]
+        }
+      },
+      "contact_profile_pic": {
+        "request": {
+          "jsonrpc": "2.0", "id": 33, "method": "contact_profile_pic",
+          "params": { "jid": "1234567890@s.whatsapp.net", "preview": false }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 33,
+          "result": {
+            "exists": true,
+            "url": "https://pps.whatsapp.net/v/t61.24694-24/...",
+            "id": "1234567890",
+            "data": "iVBORw0KGgoAAAANSUhEUgAA..."
+          }
+        }
+      }
+    },
+    "groups": {
+      "groups_list": {
+        "request": {
+          "jsonrpc": "2.0", "id": 40, "method": "groups",
+          "params": { "refresh": false }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 40,
+          "result": [
+            {
+              "jid": "120363012345678901@g.us",
+              "name": "Project Team",
+              "topic": "Discuss project updates here",
+              "owner": "1234567890@s.whatsapp.net",
+              "participants": [
+                { "jid": "1234567890@s.whatsapp.net", "phone": "1234567890", "name": "John", "is_admin": true, "is_super_admin": true },
+                { "jid": "9876543210@s.whatsapp.net", "phone": "9876543210", "name": "Jane", "is_admin": false, "is_super_admin": false }
+              ],
+              "created_at": "2024-06-15T08:00:00Z",
+              "size": 2,
+              "is_announce": false,
+              "is_locked": false,
+              "is_community": false
+            }
+          ]
+        }
+      },
+      "group_info": {
+        "request": {
+          "jsonrpc": "2.0", "id": 41, "method": "group_info",
+          "params": { "group_id": "120363012345678901@g.us", "refresh": true }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 41,
+          "result": {
+            "jid": "120363012345678901@g.us",
+            "name": "Project Team",
+            "topic": "Discuss project updates here",
+            "owner": "1234567890@s.whatsapp.net",
+            "participants": [
+              { "jid": "1234567890@s.whatsapp.net", "phone": "1234567890", "name": "John", "is_admin": true, "is_super_admin": true },
+              { "jid": "9876543210@s.whatsapp.net", "phone": "9876543210", "name": "Jane", "is_admin": false, "is_super_admin": false }
+            ],
+            "created_at": "2024-06-15T08:00:00Z",
+            "size": 2,
+            "is_announce": false,
+            "is_locked": false,
+            "is_community": false
+          }
+        }
+      },
+      "group_update": {
+        "request": {
+          "jsonrpc": "2.0", "id": 42, "method": "group_update",
+          "params": { "group_id": "120363012345678901@g.us", "name": "New Team Name", "topic": "Updated description" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 42, "result": { "message": "Updated" } }
+      },
+      "group_participants_add": {
+        "request": {
+          "jsonrpc": "2.0", "id": 43, "method": "group_participants_add",
+          "params": { "group_id": "120363012345678901@g.us", "participants": ["5551234567", "5559876543"] }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 43,
+          "result": {
+            "group_id": "120363012345678901@g.us",
+            "action": "add",
+            "results": [
+              { "jid": "5551234567@s.whatsapp.net", "phone": "5551234567", "success": true },
+              { "jid": "5559876543@s.whatsapp.net", "phone": "5559876543", "success": false, "error": "not a WhatsApp user" }
+            ],
+            "added": 1,
+            "failed": 1
+          }
+        }
+      },
+      "group_participants_remove": {
+        "request": {
+          "jsonrpc": "2.0", "id": 44, "method": "group_participants_remove",
+          "params": { "group_id": "120363012345678901@g.us", "participants": ["5551234567"] }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 44,
+          "result": {
+            "group_id": "120363012345678901@g.us",
+            "action": "remove",
+            "results": [
+              { "jid": "5551234567@s.whatsapp.net", "phone": "5551234567", "success": true }
+            ],
+            "removed": 1,
+            "failed": 0
+          }
+        }
+      },
+      "group_invite_link": {
+        "request": {
+          "jsonrpc": "2.0", "id": 45, "method": "group_invite_link",
+          "params": { "group_id": "120363012345678901@g.us" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 45,
+          "result": {
+            "group_id": "120363012345678901@g.us",
+            "invite_link": "https://chat.whatsapp.com/ABCdef123456"
+          }
+        }
+      },
+      "group_revoke_invite": {
+        "request": {
+          "jsonrpc": "2.0", "id": 46, "method": "group_revoke_invite",
+          "params": { "group_id": "120363012345678901@g.us" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 46,
+          "result": {
+            "group_id": "120363012345678901@g.us",
+            "invite_link": "https://chat.whatsapp.com/XYZabc789012",
+            "revoked": true
+          }
+        }
+      }
+    },
+    "chat_history": {
+      "by_phone": {
+        "request": {
+          "jsonrpc": "2.0", "id": 50, "method": "chat_history",
+          "params": { "phone": "1234567890", "limit": 3, "text_only": true }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 50,
+          "result": {
+            "messages": [
+              {
+                "message_id": "3EB0A0B12F4A7C",
+                "chat_id": "1234567890@s.whatsapp.net",
+                "sender": "1234567890@s.whatsapp.net",
+                "sender_phone": "1234567890",
+                "message_type": "text",
+                "text": "Hey, how are you?",
+                "timestamp": "2026-02-26T09:15:00Z",
+                "is_group": false,
+                "is_from_me": false
+              },
+              {
+                "message_id": "3EB0A0B12F4A7D",
+                "chat_id": "1234567890@s.whatsapp.net",
+                "sender": "919876543210@s.whatsapp.net",
+                "sender_phone": "919876543210",
+                "message_type": "text",
+                "text": "Doing great, thanks!",
+                "timestamp": "2026-02-26T09:16:00Z",
+                "is_group": false,
+                "is_from_me": true
+              }
+            ],
+            "total": 245,
+            "has_more": true
+          }
+        }
+      },
+      "by_group": {
+        "request": {
+          "jsonrpc": "2.0", "id": 51, "method": "chat_history",
+          "params": { "group_id": "120363012345678901@g.us", "limit": 50, "offset": 0 }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 51,
+          "result": {
+            "messages": [
+              {
+                "message_id": "3EB0C1D23E5B8A",
+                "chat_id": "120363012345678901@g.us",
+                "sender": "1234567890@s.whatsapp.net",
+                "sender_phone": "1234567890",
+                "message_type": "text",
+                "text": "Meeting at 3pm today",
+                "timestamp": "2026-02-26T08:00:00Z",
+                "is_group": true,
+                "is_from_me": false
+              }
+            ],
+            "total": 1832,
+            "has_more": true
+          }
+        }
+      }
+    },
+    "newsletters": {
+      "list": {
+        "request": {
+          "jsonrpc": "2.0", "id": 60, "method": "newsletters",
+          "params": { "refresh": false }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 60,
+          "result": [
+            {
+              "jid": "120363198765432101@newsletter",
+              "name": "Tech News Daily",
+              "description": "Daily technology news and updates",
+              "subscriber_count": 125000,
+              "verification_state": "verified",
+              "state": "active",
+              "invite_code": "0029VaXyz123ABC",
+              "invite_link": "https://whatsapp.com/channel/0029VaXyz123ABC",
+              "picture_url": "https://mmg.whatsapp.net/v/t61.24694-24/...",
+              "picture_id": "1234567890",
+              "preview_url": "https://mmg.whatsapp.net/v/t61.24694-24/...",
+              "role": "subscriber",
+              "mute": "off",
+              "created_at": 1700000000
+            }
+          ]
+        }
+      },
+      "info_by_jid": {
+        "request": {
+          "jsonrpc": "2.0", "id": 61, "method": "newsletter_info",
+          "params": { "jid": "120363198765432101@newsletter" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 61,
+          "result": {
+            "jid": "120363198765432101@newsletter",
+            "name": "Tech News Daily",
+            "description": "Daily technology news and updates",
+            "subscriber_count": 125000,
+            "verification_state": "verified",
+            "state": "active",
+            "invite_code": "0029VaXyz123ABC",
+            "invite_link": "https://whatsapp.com/channel/0029VaXyz123ABC",
+            "picture_url": "https://mmg.whatsapp.net/v/t61.24694-24/...",
+            "role": "subscriber",
+            "mute": "off",
+            "created_at": 1700000000
+          }
+        }
+      },
+      "info_by_invite": {
+        "request": {
+          "jsonrpc": "2.0", "id": 62, "method": "newsletter_info",
+          "params": { "invite": "https://whatsapp.com/channel/0029VaXyz123ABC" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 62,
+          "result": {
+            "jid": "120363198765432101@newsletter",
+            "name": "Tech News Daily",
+            "description": "Daily technology news and updates",
+            "subscriber_count": 125000,
+            "verification_state": "verified",
+            "state": "active",
+            "invite_code": "0029VaXyz123ABC",
+            "invite_link": "https://whatsapp.com/channel/0029VaXyz123ABC",
+            "role": "guest",
+            "created_at": 1700000000
+          }
+        }
+      },
+      "create": {
+        "request": {
+          "jsonrpc": "2.0", "id": 63, "method": "newsletter_create",
+          "params": { "name": "My Channel", "description": "A channel about cool things" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 63,
+          "result": {
+            "jid": "120363299876543201@newsletter",
+            "name": "My Channel",
+            "description": "A channel about cool things",
+            "subscriber_count": 0,
+            "verification_state": "unverified",
+            "state": "active",
+            "invite_code": "0029VbDef456GHI",
+            "invite_link": "https://whatsapp.com/channel/0029VbDef456GHI",
+            "role": "owner",
+            "created_at": 1740000000
+          }
+        }
+      },
+      "follow": {
+        "request": {
+          "jsonrpc": "2.0", "id": 64, "method": "newsletter_follow",
+          "params": { "jid": "120363198765432101@newsletter" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 64, "result": { "message": "Followed" } }
+      },
+      "unfollow": {
+        "request": {
+          "jsonrpc": "2.0", "id": 65, "method": "newsletter_unfollow",
+          "params": { "jid": "120363198765432101@newsletter" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 65, "result": { "message": "Unfollowed" } }
+      },
+      "mute": {
+        "request": {
+          "jsonrpc": "2.0", "id": 66, "method": "newsletter_mute",
+          "params": { "jid": "120363198765432101@newsletter", "mute": true }
+        },
+        "response": { "jsonrpc": "2.0", "id": 66, "result": { "message": "Mute updated", "mute": true } }
+      },
+      "messages": {
+        "request": {
+          "jsonrpc": "2.0", "id": 67, "method": "newsletter_messages",
+          "params": { "jid": "120363198765432101@newsletter", "count": 5 }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 67,
+          "result": [
+            {
+              "message_server_id": 142,
+              "message_id": "3EB0NEWSLETTER001",
+              "type": "text",
+              "timestamp": 1740500000,
+              "views_count": 45200,
+              "reaction_counts": { "\ud83d\udc4d": 320, "\u2764\ufe0f": 150, "\ud83d\ude02": 85 },
+              "text": "Breaking: New feature released today!"
+            },
+            {
+              "message_server_id": 141,
+              "message_id": "3EB0NEWSLETTER002",
+              "type": "image",
+              "timestamp": 1740490000,
+              "views_count": 38700,
+              "reaction_counts": { "\ud83d\udd25": 210 },
+              "text": "Screenshot of the new UI"
+            }
+          ]
+        }
+      },
+      "send_text": {
+        "request": {
+          "jsonrpc": "2.0", "id": 68, "method": "newsletter_send",
+          "params": {
+            "group_id": "120363299876543201@newsletter",
+            "type": "text",
+            "message": "Hello subscribers! Welcome to our channel."
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 68, "result": { "message": "Sent" } }
+      },
+      "send_image": {
+        "request": {
+          "jsonrpc": "2.0", "id": 69, "method": "newsletter_send",
+          "params": {
+            "group_id": "120363299876543201@newsletter",
+            "type": "image",
+            "media_data": {
+              "data": "iVBORw0KGgoAAAANSUhEUgAA...",
+              "mime_type": "image/jpeg",
+              "caption": "Our latest product launch"
+            }
+          }
+        },
+        "response": { "jsonrpc": "2.0", "id": 69, "result": { "message": "Sent" } }
+      },
+      "mark_viewed": {
+        "request": {
+          "jsonrpc": "2.0", "id": 70, "method": "newsletter_mark_viewed",
+          "params": { "jid": "120363198765432101@newsletter", "server_ids": [142, 141, 140] }
+        },
+        "response": { "jsonrpc": "2.0", "id": 70, "result": { "message": "Marked as viewed" } }
+      },
+      "react": {
+        "request": {
+          "jsonrpc": "2.0", "id": 71, "method": "newsletter_react",
+          "params": { "jid": "120363198765432101@newsletter", "server_id": 142, "reaction": "\ud83d\udc4d" }
+        },
+        "response": { "jsonrpc": "2.0", "id": 71, "result": { "message": "Reaction sent" } }
+      },
+      "live_updates": {
+        "request": {
+          "jsonrpc": "2.0", "id": 72, "method": "newsletter_live_updates",
+          "params": { "jid": "120363198765432101@newsletter" }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 72,
+          "result": { "message": "Subscribed", "duration_seconds": 300 }
+        }
+      },
+      "stats": {
+        "request": {
+          "jsonrpc": "2.0", "id": 73, "method": "newsletter_stats",
+          "params": { "jid": "120363198765432101@newsletter", "count": 10 }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 73,
+          "result": {
+            "jid": "120363198765432101@newsletter",
+            "name": "Tech News Daily",
+            "subscriber_count": 125000,
+            "state": "active",
+            "total_views": 412500,
+            "total_reactions": 8750,
+            "avg_views_per_message": 41250.0,
+            "avg_reactions_per_message": 875.0,
+            "message_count": 10,
+            "top_reactions": [
+              { "emoji": "\ud83d\udc4d", "count": 3200 },
+              { "emoji": "\u2764\ufe0f", "count": 2800 },
+              { "emoji": "\ud83d\ude02", "count": 1500 },
+              { "emoji": "\ud83d\udd25", "count": 1250 }
+            ],
+            "messages": [
+              {
+                "message_server_id": 142,
+                "timestamp": 1740500000,
+                "views_count": 45200,
+                "reaction_counts": { "\ud83d\udc4d": 320, "\u2764\ufe0f": 150, "\ud83d\ude02": 85 },
+                "text": "Breaking: New feature released today!"
+              },
+              {
+                "message_server_id": 141,
+                "timestamp": 1740490000,
+                "views_count": 38700,
+                "reaction_counts": { "\ud83d\udd25": 210 },
+                "text": "Screenshot of the new UI"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "rate_limiting": {
+      "get": {
+        "request": { "jsonrpc": "2.0", "id": 80, "method": "rate_limit_get", "params": {} },
+        "response": {
+          "jsonrpc": "2.0", "id": 80,
+          "result": {
+            "config": {
+              "enabled": true,
+              "min_delay_ms": 3000,
+              "max_delay_ms": 8000,
+              "typing_delay_ms": 2000,
+              "link_extra_delay_ms": 5000,
+              "max_messages_per_minute": 10,
+              "max_messages_per_hour": 60,
+              "max_new_contacts_per_day": 20,
+              "simulate_typing": true,
+              "randomize_delays": true,
+              "pause_on_low_response": false,
+              "response_rate_threshold": 0.3
+            },
+            "stats": {
+              "messages_sent_last_minute": 2,
+              "messages_sent_last_hour": 15,
+              "messages_sent_today": 42,
+              "new_contacts_today": 3,
+              "responses_received": 28,
+              "response_rate": 0.67,
+              "is_paused": false,
+              "pause_reason": "",
+              "last_message_time": "2026-02-26T10:28:00Z",
+              "next_allowed_time": "2026-02-26T10:28:05Z"
+            }
+          }
+        }
+      },
+      "set": {
+        "request": {
+          "jsonrpc": "2.0", "id": 81, "method": "rate_limit_set",
+          "params": {
+            "enabled": true,
+            "min_delay_ms": 5000,
+            "max_messages_per_hour": 30,
+            "simulate_typing": true,
+            "randomize_delays": true
+          }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 81,
+          "result": {
+            "message": "Rate limit config updated",
+            "config": {
+              "enabled": true,
+              "min_delay_ms": 5000,
+              "max_delay_ms": 8000,
+              "typing_delay_ms": 2000,
+              "link_extra_delay_ms": 5000,
+              "max_messages_per_minute": 10,
+              "max_messages_per_hour": 30,
+              "max_new_contacts_per_day": 20,
+              "simulate_typing": true,
+              "randomize_delays": true,
+              "pause_on_low_response": false,
+              "response_rate_threshold": 0.3
+            }
+          }
+        }
+      },
+      "stats": {
+        "request": { "jsonrpc": "2.0", "id": 82, "method": "rate_limit_stats", "params": {} },
+        "response": {
+          "jsonrpc": "2.0", "id": 82,
+          "result": {
+            "messages_sent_last_minute": 2,
+            "messages_sent_last_hour": 15,
+            "messages_sent_today": 42,
+            "new_contacts_today": 3,
+            "responses_received": 28,
+            "response_rate": 0.67,
+            "is_paused": false,
+            "pause_reason": "",
+            "last_message_time": "2026-02-26T10:28:00Z",
+            "next_allowed_time": "2026-02-26T10:28:05Z"
+          }
+        }
+      },
+      "unpause": {
+        "request": { "jsonrpc": "2.0", "id": 83, "method": "rate_limit_unpause", "params": {} },
+        "response": {
+          "jsonrpc": "2.0", "id": 83,
+          "result": {
+            "message": "Rate limiting unpaused",
+            "stats": {
+              "messages_sent_last_minute": 0,
+              "messages_sent_last_hour": 15,
+              "messages_sent_today": 42,
+              "new_contacts_today": 3,
+              "responses_received": 28,
+              "response_rate": 0.67,
+              "is_paused": false,
+              "pause_reason": "",
+              "last_message_time": "2026-02-26T10:28:00Z",
+              "next_allowed_time": "2026-02-26T10:28:00Z"
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "message_received_text": {
         "jsonrpc": "2.0",
         "method": "event.message_received",
         "params": {
-          "message_id": "ABC123",
+          "message_id": "3EB0A0B12F4A7C",
           "sender": "1234567890@s.whatsapp.net",
+          "sender_phone": "1234567890",
           "chat_id": "1234567890@s.whatsapp.net",
-          "timestamp": "2025-01-15T10:30:00Z",
+          "timestamp": "2026-02-26T10:30:00Z",
           "is_from_me": false,
           "is_group": false,
+          "is_forwarded": false,
+          "forwarding_score": 0,
           "message_type": "text",
           "text": "Hello world!",
           "content": "Hello world!"
         }
-      }
-    },
-    "send_text": {
-      "description": "Send text message",
-      "value": {
+      },
+      "message_received_image": {
         "jsonrpc": "2.0",
-        "id": 2,
-        "method": "send",
+        "method": "event.message_received",
         "params": {
-          "phone": "1234567890",
-          "type": "text",
-          "message": "Hello from API!"
-        }
-      }
-    },
-    "send_image": {
-      "description": "Send image message",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 3,
-        "method": "send",
-        "params": {
-          "phone": "1234567890",
-          "type": "image",
-          "media_data": {
-            "data": "base64_encoded_image_data",
+          "message_id": "3EB0A0B12F4A8X",
+          "sender": "1234567890@s.whatsapp.net",
+          "sender_phone": "1234567890",
+          "chat_id": "1234567890@s.whatsapp.net",
+          "timestamp": "2026-02-26T10:31:00Z",
+          "is_from_me": false,
+          "is_group": false,
+          "is_forwarded": false,
+          "forwarding_score": 0,
+          "message_type": "image",
+          "image": {
             "mime_type": "image/jpeg",
-            "caption": "Check this out!"
+            "file_sha256": "abc123def456...",
+            "file_length": 245000,
+            "caption": "Check this photo",
+            "url": "https://mmg.whatsapp.net/..."
           }
         }
-      }
-    },
-    "send_to_group": {
-      "description": "Send message to group",
-      "value": {
+      },
+      "message_received_group": {
         "jsonrpc": "2.0",
-        "id": 4,
-        "method": "send",
+        "method": "event.message_received",
         "params": {
-          "group_id": "123456789@g.us",
-          "type": "text",
-          "message": "Hello group!"
-        }
-      }
-    },
-    "send_location": {
-      "description": "Send location message",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 5,
-        "method": "send",
-        "params": {
-          "phone": "1234567890",
-          "type": "location",
-          "location": {
-            "latitude": 37.7749,
-            "longitude": -122.4194,
-            "name": "San Francisco",
-            "address": "California, USA"
+          "message_id": "3EB0C1D23E5B8A",
+          "sender": "1234567890@s.whatsapp.net",
+          "sender_phone": "1234567890",
+          "chat_id": "120363012345678901@g.us",
+          "timestamp": "2026-02-26T10:32:00Z",
+          "is_from_me": false,
+          "is_group": true,
+          "is_forwarded": true,
+          "forwarding_score": 3,
+          "message_type": "text",
+          "text": "Forwarded message content",
+          "content": "Forwarded message content",
+          "group_info": {
+            "group_jid": "120363012345678901@g.us",
+            "sender_jid": "1234567890@s.whatsapp.net",
+            "sender_phone": "1234567890",
+            "sender_name": "John"
           }
         }
-      }
-    },
-    "download_media": {
-      "description": "Download media from message",
-      "value": {
+      },
+      "qr_code": {
         "jsonrpc": "2.0",
-        "id": 6,
-        "method": "media",
+        "method": "event.qr_code",
         "params": {
-          "message_id": "ABC123DEF456"
+          "code": "2@abc123def456,ghi789jkl012,mno345pqr678",
+          "image_data": "iVBORw0KGgoAAAANSUhEUgAA..."
         }
-      }
-    },
-    "error_response": {
-      "description": "Error response format",
-      "value": {
+      },
+      "connected": {
         "jsonrpc": "2.0",
-        "id": 1,
-        "error": {
-          "code": -32000,
-          "message": "WhatsApp not connected"
-        }
-      }
-    },
-    "rate_limit_get": {
-      "description": "Get rate limit config and stats",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 7,
-        "method": "rate_limit_get",
-        "params": {}
-      }
-    },
-    "rate_limit_set": {
-      "description": "Update rate limit configuration",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 8,
-        "method": "rate_limit_set",
+        "method": "event.connected",
         "params": {
-          "enabled": true,
-          "min_delay_ms": 5000,
-          "max_messages_per_hour": 30,
-          "simulate_typing": true
+          "status": "connected",
+          "device_id": "919876543210:25@s.whatsapp.net"
+        }
+      },
+      "history_sync_complete": {
+        "jsonrpc": "2.0",
+        "method": "event.history_sync_complete",
+        "params": {
+          "conversations": 48,
+          "messages": 12500
+        }
+      },
+      "newsletter_join": {
+        "jsonrpc": "2.0",
+        "method": "event.newsletter_join",
+        "params": {
+          "newsletter": {
+            "jid": "120363198765432101@newsletter",
+            "name": "Tech News Daily",
+            "description": "Daily technology news and updates",
+            "subscriber_count": 125000,
+            "verification_state": "verified",
+            "state": "active",
+            "role": "subscriber"
+          }
+        }
+      },
+      "newsletter_live_update": {
+        "jsonrpc": "2.0",
+        "method": "event.newsletter_live_update",
+        "params": {
+          "jid": "120363198765432101@newsletter",
+          "messages": [
+            {
+              "message_server_id": 142,
+              "message_id": "3EB0NEWSLETTER001",
+              "views_count": 45250,
+              "reaction_counts": { "\ud83d\udc4d": 321, "\u2764\ufe0f": 151 }
+            }
+          ]
         }
       }
     },
-    "rate_limit_unpause": {
-      "description": "Resume after automatic pause",
-      "value": {
-        "jsonrpc": "2.0",
-        "id": 9,
-        "method": "rate_limit_unpause",
-        "params": {}
+    "errors": {
+      "method_not_found": {
+        "jsonrpc": "2.0", "id": 1,
+        "error": { "code": -32601, "message": "Method not found: unknown_method" }
+      },
+      "invalid_params": {
+        "jsonrpc": "2.0", "id": 2,
+        "error": { "code": -32602, "message": "group_id is required" }
+      },
+      "server_error": {
+        "jsonrpc": "2.0", "id": 3,
+        "error": { "code": -32000, "message": "WhatsApp not connected" }
+      },
+      "no_qr_available": {
+        "jsonrpc": "2.0", "id": 4,
+        "error": { "code": -32001, "message": "No QR available" }
       }
     }
   },
