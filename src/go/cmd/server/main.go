@@ -37,7 +37,7 @@ func main() {
 	logger.Info("Starting WhatsApp WebSocket RPC Server")
 
 	// Initialize WhatsApp service
-	whatsappService, err := whatsapp.NewService(cfg.Database, logger)
+	whatsappService, err := whatsapp.NewService(cfg, logger)
 	if err != nil {
 		logger.Fatalf("Failed to initialize WhatsApp service: %v", err)
 	}

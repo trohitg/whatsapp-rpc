@@ -497,19 +497,15 @@ func (h *RPCHandler) HandleRequest(req *RPCRequest) RPCResponse {
 		}
 
 	case "newsletter_messages":
-		var p struct {
-			JID    string `json:"jid"`
-			Count  int    `json:"count"`
-			Before int    `json:"before"`
-		}
-		if err := json.Unmarshal(req.Params, &p); err != nil {
+		var query whatsapp.NewsletterMessageQuery
+		if err := json.Unmarshal(req.Params, &query); err != nil {
 			resp.Error = &RPCError{Code: -32602, Message: "Invalid params: " + err.Error()}
-		} else if p.JID == "" {
+		} else if query.JID == "" {
 			resp.Error = &RPCError{Code: -32602, Message: "jid is required"}
-		} else if msgs, err := h.service.GetNewsletterMessages(p.JID, p.Count, p.Before); err != nil {
+		} else if result, err := h.service.GetNewsletterMessages(&query); err != nil {
 			resp.Error = &RPCError{Code: -32000, Message: err.Error()}
 		} else {
-			resp.Result = msgs
+			resp.Result = result
 		}
 
 	case "newsletter_send":

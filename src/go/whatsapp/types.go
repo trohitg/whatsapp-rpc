@@ -230,6 +230,31 @@ type NewsletterMessageInfo struct {
 	ViewsCount      int            `json:"views_count"`
 	ReactionCounts  map[string]int `json:"reaction_counts,omitempty"`
 	Text            string         `json:"text,omitempty"`
+	MediaType       string         `json:"media_type,omitempty"`
+	MimeType        string         `json:"mime_type,omitempty"`
+	FileLength      uint64         `json:"file_length,omitempty"`
+	Filename        string         `json:"filename,omitempty"`
+}
+
+// NewsletterMessageQuery represents query parameters for fetching newsletter messages
+type NewsletterMessageQuery struct {
+	JID       string `json:"jid"`
+	Count     int    `json:"count"`      // Max messages to return (default 50)
+	Offset    int    `json:"offset"`     // Skip first N results (for pagination)
+	Before    int    `json:"before"`     // Cursor: message_server_id to fetch before
+	Since     int64  `json:"since"`      // Unix timestamp: only messages after this time
+	Until     int64  `json:"until"`      // Unix timestamp: only messages before this time
+	MediaType string `json:"media_type"` // Filter: image, video, audio, document, sticker
+	Search    string `json:"search"`     // Text search in message text/captions
+	Refresh   bool   `json:"refresh"`    // Force API fetch, bypass cache
+}
+
+// NewsletterMessageResult is the response for newsletter message queries
+type NewsletterMessageResult struct {
+	Messages []NewsletterMessageInfo `json:"messages"`
+	Total    int                     `json:"total"`
+	HasMore  bool                    `json:"has_more"`
+	Cached   bool                    `json:"cached"`
 }
 
 // CreateNewsletterRequest for creating a new channel

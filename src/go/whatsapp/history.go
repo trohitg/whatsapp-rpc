@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -172,6 +173,32 @@ func (h *HistoryStore) initTable() error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_newsletter_name ON newsletter_cache(name);
 	`)
+	if err != nil {
+		return err
+	}
+
+	// Newsletter message cache
+	_, err = h.db.Exec(`
+		CREATE TABLE IF NOT EXISTS newsletter_message_cache (
+			message_id TEXT PRIMARY KEY,
+			newsletter_jid TEXT NOT NULL,
+			message_server_id INTEGER NOT NULL,
+			message_type TEXT,
+			timestamp INTEGER NOT NULL,
+			views_count INTEGER DEFAULT 0,
+			reaction_counts TEXT,
+			text TEXT,
+			media_type TEXT,
+			mime_type TEXT,
+			file_length INTEGER DEFAULT 0,
+			filename TEXT,
+			fetched_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+		);
+		CREATE INDEX IF NOT EXISTS idx_nl_msg_jid ON newsletter_message_cache(newsletter_jid);
+		CREATE INDEX IF NOT EXISTS idx_nl_msg_ts ON newsletter_message_cache(timestamp DESC);
+		CREATE INDEX IF NOT EXISTS idx_nl_msg_server_id ON newsletter_message_cache(message_server_id DESC);
+		CREATE INDEX IF NOT EXISTS idx_nl_msg_media ON newsletter_message_cache(media_type);
+	`)
 	return err
 }
 
@@ -260,6 +287,26 @@ func (h *HistoryStore) Close() error {
 func (h *HistoryStore) ClearHistory() error {
 	_, err := h.db.Exec("DELETE FROM message_history")
 	return err
+}
+
+// ClearAllData deletes all data from all cache tables (for full reset)
+func (h *HistoryStore) ClearAllData() error {
+	tables := []string{
+		"message_history",
+		"groups",
+		"group_participants",
+		"contact_check_cache",
+		"profile_pic_cache",
+		"group_invite_cache",
+		"newsletter_cache",
+		"newsletter_message_cache",
+	}
+	for _, table := range tables {
+		if _, err := h.db.Exec("DELETE FROM " + table); err != nil {
+			h.logger.Warnf("Failed to clear table %s: %v", table, err)
+		}
+	}
+	return nil
 }
 
 func boolToInt(b bool) int {
@@ -719,4 +766,110 @@ func (h *HistoryStore) HasCachedNewsletters() bool {
 	var count int
 	h.db.QueryRow("SELECT COUNT(*) FROM newsletter_cache").Scan(&count)
 	return count > 0
+}
+
+// ============================================================================
+// Newsletter Message Cache Methods
+// ============================================================================
+
+func (h *HistoryStore) StoreNewsletterMessages(newsletterJID string, messages []NewsletterMessageInfo) error {
+	if len(messages) == 0 {
+		return nil
+	}
+	tx, err := h.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT OR REPLACE INTO newsletter_message_cache
+		(message_id, newsletter_jid, message_server_id, message_type, timestamp,
+		 views_count, reaction_counts, text, media_type, mime_type, file_length, filename, fetched_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now().Unix()
+	for _, m := range messages {
+		reactions := ""
+		if len(m.ReactionCounts) > 0 {
+			b, _ := json.Marshal(m.ReactionCounts)
+			reactions = string(b)
+		}
+		stmt.Exec(m.MessageID, newsletterJID, m.MessageServerID, m.Type, m.Timestamp,
+			m.ViewsCount, reactions, m.Text, m.MediaType, m.MimeType, m.FileLength, m.Filename, now)
+	}
+	return tx.Commit()
+}
+
+func (h *HistoryStore) GetCachedNewsletterMessages(query *NewsletterMessageQuery, limit, offset int) ([]NewsletterMessageInfo, int, error) {
+	where := "newsletter_jid = ?"
+	args := []interface{}{query.JID}
+
+	if query.Before > 0 {
+		where += " AND message_server_id < ?"
+		args = append(args, query.Before)
+	}
+	if query.Since > 0 {
+		where += " AND timestamp >= ?"
+		args = append(args, query.Since)
+	}
+	if query.Until > 0 {
+		where += " AND timestamp <= ?"
+		args = append(args, query.Until)
+	}
+	if query.MediaType != "" {
+		where += " AND media_type = ?"
+		args = append(args, query.MediaType)
+	}
+	if query.Search != "" {
+		where += " AND text LIKE ?"
+		args = append(args, "%"+query.Search+"%")
+	}
+
+	var total int
+	h.db.QueryRow("SELECT COUNT(*) FROM newsletter_message_cache WHERE "+where, args...).Scan(&total)
+
+	queryArgs := append(args, limit, offset)
+	rows, err := h.db.Query(`
+		SELECT message_id, message_server_id, message_type, timestamp,
+			views_count, reaction_counts, text, media_type, mime_type, file_length, filename
+		FROM newsletter_message_cache WHERE `+where+`
+		ORDER BY timestamp DESC LIMIT ? OFFSET ?
+	`, queryArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var messages []NewsletterMessageInfo
+	for rows.Next() {
+		var m NewsletterMessageInfo
+		var reactions string
+		err := rows.Scan(&m.MessageID, &m.MessageServerID, &m.Type, &m.Timestamp,
+			&m.ViewsCount, &reactions, &m.Text, &m.MediaType, &m.MimeType, &m.FileLength, &m.Filename)
+		if err != nil {
+			continue
+		}
+		if reactions != "" {
+			json.Unmarshal([]byte(reactions), &m.ReactionCounts)
+		}
+		messages = append(messages, m)
+	}
+	return messages, total, nil
+}
+
+func (h *HistoryStore) HasCachedNewsletterMessages(newsletterJID string) bool {
+	var count int
+	h.db.QueryRow("SELECT COUNT(*) FROM newsletter_message_cache WHERE newsletter_jid = ?", newsletterJID).Scan(&count)
+	return count > 0
+}
+
+func (h *HistoryStore) DeleteNewsletterMessages(newsletterJID string) error {
+	_, err := h.db.Exec("DELETE FROM newsletter_message_cache WHERE newsletter_jid = ?", newsletterJID)
+	return err
 }

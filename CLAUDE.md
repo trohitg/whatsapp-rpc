@@ -64,7 +64,7 @@ docker-compose build      # Rebuild images
 | `status` | Get connection status |
 | `start` | Start WhatsApp |
 | `stop` | Stop WhatsApp |
-| `restart` | Full reset (logout, delete DB, new QR) |
+| `restart` | Full reset (logout, clear all caches, new QR) |
 | `qr` | Get QR code (base64 PNG) |
 | `send` | Send message |
 | `media` | Download received media |
@@ -79,7 +79,7 @@ docker-compose build      # Rebuild images
 | `newsletter_follow` | Subscribe to a channel |
 | `newsletter_unfollow` | Unsubscribe from a channel |
 | `newsletter_mute` | Mute/unmute a channel |
-| `newsletter_messages` | Get messages from a channel |
+| `newsletter_messages` | Get channel messages (lazy cached in SQLite, use `refresh: true` to re-fetch). Returns media info for download via `media` RPC |
 | `newsletter_send` | Send message to a channel (admin only) |
 | `newsletter_mark_viewed` | Mark channel messages as viewed |
 | `newsletter_react` | React to a channel message |
@@ -97,6 +97,7 @@ Read queries are cached in SQLite to prevent WhatsApp rate limits (429 errors):
 | Profile pictures | TTL 24 hours |
 | Group invite links | TTL 1 hour |
 | Newsletter (channel) metadata | TTL 24 hours |
+| Newsletter messages | Lazy per-channel (fetched on first access, use `refresh: true` to re-fetch) |
 
 Cache tables in `data/whatsapp.db_history`:
 - `groups`, `group_participants` - Group data
@@ -104,16 +105,26 @@ Cache tables in `data/whatsapp.db_history`:
 - `profile_pic_cache` - Profile picture URLs
 - `group_invite_cache` - Invite links
 - `newsletter_cache` - Channel metadata
+- `newsletter_message_cache` - Channel messages with media info
 
 ## Configuration
 
 ```yaml
 # configs/config.yaml
+environment: "development"
+log_level: 4
 server:
   port: 9400
   host: "127.0.0.1"
 database:
   path: "data/whatsapp.db"
+qr_timeout_seconds: 300
+newsletter:
+  fetch_page_size: 100
+  fetch_delay_ms: 2000
+  default_limit: 50
+  max_limit: 500
+  media_cache_size: 100
 ```
 
 ## Key Files

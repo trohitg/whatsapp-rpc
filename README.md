@@ -106,7 +106,7 @@ Connect via WebSocket to `ws://localhost:9400/ws/rpc` and send JSON-RPC 2.0 requ
 | `status` | Get connection status (connected, has_session, running, pairing, device_id) |
 | `start` | Start WhatsApp service |
 | `stop` | Stop WhatsApp service |
-| `restart` | Full reset: logout, delete DB, cleanup, start fresh |
+| `restart` | Full reset: logout, clear all caches, cleanup, start fresh |
 | `reset` | Reset session (logout and delete credentials) |
 | `diagnostics` | Get detailed diagnostics information |
 | `qr` | Get QR code for pairing (code, image_data as base64 PNG) |
@@ -154,7 +154,7 @@ Connect via WebSocket to `ws://localhost:9400/ws/rpc` and send JSON-RPC 2.0 requ
 | `newsletter_follow` | `jid` | Subscribe to a channel |
 | `newsletter_unfollow` | `jid` | Unsubscribe from a channel |
 | `newsletter_mute` | `jid`, `mute` | Mute/unmute a channel |
-| `newsletter_messages` | `jid`, `count`, `before` | Get channel messages |
+| `newsletter_messages` | `jid`, `count`, `offset`, `before`, `since`, `until`, `media_type`, `search`, `refresh` | Get channel messages (lazy cached, filterable) |
 | `newsletter_send` | `group_id`, `type`, `message`/`media_data` | Send to channel (admin only) |
 | `newsletter_mark_viewed` | `jid`, `server_ids[]` | Mark messages as viewed |
 | `newsletter_react` | `jid`, `server_id`, `reaction` | React to a channel message |

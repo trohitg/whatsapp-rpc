@@ -5,3 +5,10 @@ server:
   host: "127.0.0.1"
 database:
   path: "data/whatsapp.db"
+qr_timeout_seconds: 300
+newsletter:
+  fetch_page_size: 100
+  fetch_delay_ms: 2000
+  default_limit: 50
+  max_limit: 500
+  media_cache_size: 100

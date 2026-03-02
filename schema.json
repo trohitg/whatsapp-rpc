@@ -62,8 +62,8 @@
     },
     {
       "name": "restart",
-      "summary": "Full reset: logout, delete DB, clear QR cache, reinit, start fresh",
-      "description": "Performs a complete reset: 1) Logout from WhatsApp servers, 2) Shutdown service, 3) Delete device session, 4) Delete database files, 5) Clear QR cache, 6) Reinitialize client, 7) Start pairing",
+      "summary": "Full reset: logout, clear all caches, reinit, start fresh",
+      "description": "Performs a complete reset: 1) Logout from WhatsApp servers, 2) Shutdown service, 3) Delete device session, 4) Clear all SQLite cache tables, 5) Clear in-memory message cache, 6) Clear QR cache, 7) Reinitialize client, 8) Start pairing",
       "params": [],
       "result": {
         "name": "RestartResult",
@@ -953,7 +953,8 @@
     },
     {
       "name": "newsletter_messages",
-      "summary": "Get messages from a channel",
+      "summary": "Get messages from a channel with lazy per-channel caching",
+      "description": "Fetches all messages from a channel on first access and caches them in SQLite. Subsequent calls serve from cache. Use refresh: true to re-fetch from WhatsApp API. Media messages can be downloaded via the media RPC using the returned message_id.",
       "params": [
         {
           "name": "jid",
@@ -963,22 +964,67 @@
         },
         {
           "name": "count",
-          "description": "Number of messages to fetch",
+          "description": "Number of messages to return (default from config, max from config)",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "offset",
+          "description": "Number of messages to skip for pagination",
           "schema": { "type": "integer" },
           "required": false
         },
         {
           "name": "before",
-          "description": "Fetch messages before this server ID (for pagination)",
+          "description": "Only return messages with message_server_id less than this value (cursor pagination)",
           "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "since",
+          "description": "Only return messages with timestamp >= this Unix timestamp",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "until",
+          "description": "Only return messages with timestamp <= this Unix timestamp",
+          "schema": { "type": "integer" },
+          "required": false
+        },
+        {
+          "name": "media_type",
+          "description": "Filter by media type",
+          "schema": { "type": "string", "enum": ["image", "video", "audio", "document", "sticker"] },
+          "required": false
+        },
+        {
+          "name": "search",
+          "description": "Text search in message text and captions (case-insensitive substring match)",
+          "schema": { "type": "string" },
+          "required": false
+        },
+        {
+          "name": "refresh",
+          "description": "Force re-fetch from WhatsApp API, replacing cached data",
+          "schema": { "type": "boolean" },
           "required": false
         }
       ],
       "result": {
         "name": "NewsletterMessagesResult",
         "schema": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/NewsletterMessageInfo" }
+          "type": "object",
+          "properties": {
+            "messages": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/NewsletterMessageInfo" }
+            },
+            "total": { "type": "integer", "description": "Total number of cached messages for this channel" },
+            "has_more": { "type": "boolean", "description": "Whether more messages are available beyond the current offset+count" },
+            "cached": { "type": "boolean", "description": "Whether the result was served from cache" }
+          },
+          "required": ["messages", "total", "has_more", "cached"]
         }
       }
     },
@@ -1316,7 +1362,11 @@
             "description": "Map of emoji to reaction count",
             "additionalProperties": { "type": "integer" }
           },
-          "text": { "type": "string", "description": "Text content or caption" }
+          "text": { "type": "string", "description": "Text content or caption" },
+          "media_type": { "type": "string", "description": "Media type if message contains media (image, video, audio, document, sticker)", "enum": ["image", "video", "audio", "document", "sticker"] },
+          "mime_type": { "type": "string", "description": "MIME type of media (e.g., image/jpeg, video/mp4)" },
+          "file_length": { "type": "integer", "description": "File size in bytes" },
+          "filename": { "type": "string", "description": "Original filename (documents only)" }
         },
         "required": ["message_server_id", "message_id", "type", "timestamp", "views_count"]
       },
@@ -2251,26 +2301,77 @@
         },
         "response": {
           "jsonrpc": "2.0", "id": 67,
-          "result": [
-            {
-              "message_server_id": 142,
-              "message_id": "3EB0NEWSLETTER001",
-              "type": "text",
-              "timestamp": 1740500000,
-              "views_count": 45200,
-              "reaction_counts": { "\ud83d\udc4d": 320, "\u2764\ufe0f": 150, "\ud83d\ude02": 85 },
-              "text": "Breaking: New feature released today!"
-            },
-            {
-              "message_server_id": 141,
-              "message_id": "3EB0NEWSLETTER002",
-              "type": "image",
-              "timestamp": 1740490000,
-              "views_count": 38700,
-              "reaction_counts": { "\ud83d\udd25": 210 },
-              "text": "Screenshot of the new UI"
-            }
-          ]
+          "result": {
+            "messages": [
+              {
+                "message_server_id": 142,
+                "message_id": "3EB0NEWSLETTER001",
+                "type": "text",
+                "timestamp": 1740500000,
+                "views_count": 45200,
+                "reaction_counts": { "\ud83d\udc4d": 320, "\u2764\ufe0f": 150, "\ud83d\ude02": 85 },
+                "text": "Breaking: New feature released today!"
+              },
+              {
+                "message_server_id": 141,
+                "message_id": "3EB0NEWSLETTER002",
+                "type": "image",
+                "timestamp": 1740490000,
+                "views_count": 38700,
+                "reaction_counts": { "\ud83d\udd25": 210 },
+                "text": "Screenshot of the new UI",
+                "media_type": "image",
+                "mime_type": "image/jpeg",
+                "file_length": 245000
+              }
+            ],
+            "total": 142,
+            "has_more": true,
+            "cached": false
+          }
+        }
+      },
+      "messages_cached": {
+        "request": {
+          "jsonrpc": "2.0", "id": 70, "method": "newsletter_messages",
+          "params": { "jid": "120363198765432101@newsletter", "count": 10, "offset": 5 }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 70,
+          "result": {
+            "messages": [
+              {
+                "message_server_id": 137,
+                "message_id": "3EB0NEWSLETTER007",
+                "type": "video",
+                "timestamp": 1740450000,
+                "views_count": 22000,
+                "reaction_counts": {},
+                "text": "Demo video",
+                "media_type": "video",
+                "mime_type": "video/mp4",
+                "file_length": 8500000
+              }
+            ],
+            "total": 142,
+            "has_more": true,
+            "cached": true
+          }
+        }
+      },
+      "messages_refresh": {
+        "request": {
+          "jsonrpc": "2.0", "id": 71, "method": "newsletter_messages",
+          "params": { "jid": "120363198765432101@newsletter", "count": 50, "refresh": true }
+        },
+        "response": {
+          "jsonrpc": "2.0", "id": 71,
+          "result": {
+            "messages": [],
+            "total": 200,
+            "has_more": true,
+            "cached": false
+          }
         }
       },
       "send_text": {

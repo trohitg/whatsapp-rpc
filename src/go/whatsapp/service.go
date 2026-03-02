@@ -44,6 +44,10 @@ type Service struct {
 	messageOrder   []string                   // Track message insertion order for FIFO cleanup
 	historyStore   *HistoryStore              // Persistent message history store
 
+	// Configurable settings
+	newsletterConfig config.NewsletterConfig
+	qrTimeoutSeconds int
+
 	// Rate limiting for anti-ban protection
 	rateMu           sync.Mutex
 	rateLimitConfig  *RateLimitConfig
@@ -56,7 +60,8 @@ type Service struct {
 
 
 
-func NewService(dbConfig config.DatabaseConfig, logger *logrus.Logger) (*Service, error) {
+func NewService(cfg *config.Config, logger *logrus.Logger) (*Service, error) {
+	dbConfig := cfg.Database
 	// Configure device to appear as legitimate WhatsApp Web on Chrome
 	// Uses default WhatsApp Web version and Chrome platform type for natural appearance
 	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
@@ -99,7 +104,9 @@ func NewService(dbConfig config.DatabaseConfig, logger *logrus.Logger) (*Service
 		pairing:          false,
 		shutdown:         false,
 		messages:         make(map[string]*events.Message),
-		messageOrder:     make([]string, 0, 100),
+		messageOrder:     make([]string, 0, cfg.Newsletter.MediaCacheSize),
+		newsletterConfig: cfg.Newsletter,
+		qrTimeoutSeconds: cfg.QRTimeout,
 		rateLimitConfig:  DefaultRateLimitConfig(),
 		rateLimitStats:   &RateLimitStats{},
 		messageTimes:     make([]time.Time, 0, 100),
@@ -454,12 +461,10 @@ func (s *Service) handleIncomingMessage(v *events.Message) {
 		s.logger.Debugf("Processing individual message from %s (phone: %s) (ID: %s)", sender, senderPhone, messageID)
 	}
 
-	// Store message for later media download (keep last 100 messages to avoid memory issues)
+	// Store message for later media download
 	s.mu.Lock()
-	// Check if message already exists (avoid duplicates)
 	if _, exists := s.messages[messageID]; !exists {
-		// Remove oldest messages if at capacity (FIFO cleanup)
-		maxMessages := 100
+		maxMessages := s.newsletterConfig.MediaCacheSize
 		for len(s.messageOrder) >= maxMessages {
 			oldestID := s.messageOrder[0]
 			s.messageOrder = s.messageOrder[1:]
@@ -1807,8 +1812,7 @@ func (s *Service) GetCurrentQRCode() *QRCodeData {
 		return nil
 	}
 
-	// Return QR if it was generated within last 60 seconds
-	if time.Since(s.lastQRCodeTime) > 60*time.Second {
+	if time.Since(s.lastQRCodeTime) > time.Duration(s.qrTimeoutSeconds)*time.Second {
 		return nil
 	}
 
@@ -2206,27 +2210,26 @@ func (s *Service) Reset() error {
 		s.logger.Info("No device session to delete (not connected)")
 	}
 
-	// Shutdown the service (disconnect, drain events)
 	s.Shutdown()
 
-	// Clear message history (belongs to old instance)
+	// Clear all cache tables (groups, contacts, newsletters, messages, etc.)
 	if s.historyStore != nil {
-		s.logger.Info("Clearing message history...")
-		if err := s.historyStore.ClearHistory(); err != nil {
-			s.logger.Warnf("Failed to clear history: %v", err)
-		}
+		s.logger.Info("Clearing all cached data...")
+		s.historyStore.ClearAllData()
 	}
 
-	// Clear client reference to allow GC and release DB locks
+	// Clear in-memory message cache
+	s.mu.Lock()
+	s.messages = make(map[string]*events.Message)
+	s.messageOrder = make([]string, 0, s.newsletterConfig.MediaCacheSize)
+	s.mu.Unlock()
+
 	s.client = nil
 	s.container = nil
 
-	// Give time for database to release locks
 	time.Sleep(500 * time.Millisecond)
 
-	// Reinitialize client with fresh database
 	if err := s.reinitClient(); err != nil {
-		s.logger.Errorf("Failed to reinitialize client: %v", err)
 		return fmt.Errorf("failed to reinitialize client: %w", err)
 	}
 
@@ -2269,7 +2272,10 @@ func (s *Service) reinitClient() error {
 
 // ClearQRCode clears the cached QR code data
 func (s *Service) ClearQRCode() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.lastQRCode = nil
+	s.lastQRCodeTime = time.Time{}
 }
 
 // ============================================================================
@@ -2312,14 +2318,41 @@ func convertNewsletterMessage(msg *types.NewsletterMessage) NewsletterMessageInf
 		ReactionCounts:  msg.ReactionCounts,
 	}
 	if msg.Message != nil {
-		if msg.Message.GetConversation() != "" {
-			info.Text = msg.Message.GetConversation()
-		} else if msg.Message.GetExtendedTextMessage() != nil {
+		// Check media types first (they may also have captions)
+		switch {
+		case msg.Message.GetImageMessage() != nil:
+			im := msg.Message.GetImageMessage()
+			info.MediaType = "image"
+			info.MimeType = im.GetMimetype()
+			info.FileLength = im.GetFileLength()
+			info.Text = im.GetCaption()
+		case msg.Message.GetVideoMessage() != nil:
+			vm := msg.Message.GetVideoMessage()
+			info.MediaType = "video"
+			info.MimeType = vm.GetMimetype()
+			info.FileLength = vm.GetFileLength()
+			info.Text = vm.GetCaption()
+		case msg.Message.GetAudioMessage() != nil:
+			am := msg.Message.GetAudioMessage()
+			info.MediaType = "audio"
+			info.MimeType = am.GetMimetype()
+			info.FileLength = am.GetFileLength()
+		case msg.Message.GetDocumentMessage() != nil:
+			dm := msg.Message.GetDocumentMessage()
+			info.MediaType = "document"
+			info.MimeType = dm.GetMimetype()
+			info.FileLength = dm.GetFileLength()
+			info.Filename = dm.GetFileName()
+			info.Text = dm.GetCaption()
+		case msg.Message.GetStickerMessage() != nil:
+			sm := msg.Message.GetStickerMessage()
+			info.MediaType = "sticker"
+			info.MimeType = sm.GetMimetype()
+			info.FileLength = sm.GetFileLength()
+		case msg.Message.GetExtendedTextMessage() != nil:
 			info.Text = msg.Message.GetExtendedTextMessage().GetText()
-		} else if msg.Message.GetImageMessage() != nil {
-			info.Text = msg.Message.GetImageMessage().GetCaption()
-		} else if msg.Message.GetVideoMessage() != nil {
-			info.Text = msg.Message.GetVideoMessage().GetCaption()
+		case msg.Message.GetConversation() != "":
+			info.Text = msg.Message.GetConversation()
 		}
 	}
 	return info
@@ -2515,37 +2548,138 @@ func (s *Service) NewsletterToggleMute(jidStr string, mute bool) error {
 	return nil
 }
 
-// GetNewsletterMessages gets messages from a channel
-func (s *Service) GetNewsletterMessages(jidStr string, count int, before int) ([]NewsletterMessageInfo, error) {
+// GetNewsletterMessages returns messages from a channel.
+// Lazy cache: on first access per channel, fetches all from API into DB.
+// Subsequent calls serve from DB. Use refresh=true to re-fetch.
+func (s *Service) GetNewsletterMessages(query *NewsletterMessageQuery) (*NewsletterMessageResult, error) {
 	if !s.client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp not connected")
 	}
 
-	jid, err := types.ParseJID(jidStr)
+	jid, err := types.ParseJID(query.JID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid JID: %w", err)
 	}
 
-	params := &whatsmeow.GetNewsletterMessagesParams{}
-	if count > 0 {
-		params.Count = count
+	limit := query.Count
+	if limit <= 0 {
+		limit = s.newsletterConfig.DefaultLimit
 	}
-	if before > 0 {
-		params.Before = types.MessageServerID(before)
+	if limit > s.newsletterConfig.MaxLimit {
+		limit = s.newsletterConfig.MaxLimit
 	}
 
-	ctx := context.Background()
-	msgs, err := s.client.GetNewsletterMessages(ctx, jid, params)
+	// Lazy fetch: pull from API if no cache or refresh requested
+	needsFetch := query.Refresh
+	if !needsFetch && s.historyStore != nil {
+		needsFetch = !s.historyStore.HasCachedNewsletterMessages(query.JID)
+	}
+
+	if needsFetch {
+		if err := s.fetchAndCacheNewsletterMessages(jid, query.JID); err != nil {
+			return nil, err
+		}
+	}
+
+	if s.historyStore == nil {
+		return nil, fmt.Errorf("history store not available")
+	}
+
+	messages, total, err := s.historyStore.GetCachedNewsletterMessages(query, limit, query.Offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get newsletter messages: %w", err)
+		return nil, fmt.Errorf("failed to read cached messages: %w", err)
+	}
+	return &NewsletterMessageResult{
+		Messages: messages,
+		Total:    total,
+		HasMore:  query.Offset+len(messages) < total,
+		Cached:   !needsFetch,
+	}, nil
+}
+
+// fetchAndCacheNewsletterMessages paginates all messages from a channel into the DB.
+func (s *Service) fetchAndCacheNewsletterMessages(jid types.JID, jidStr string) error {
+	ctx := context.Background()
+	pageSize := s.newsletterConfig.FetchPageSize
+	delayMs := s.newsletterConfig.FetchDelayMs
+	cursor := 0
+	totalFetched := 0
+
+	if s.historyStore != nil {
+		s.historyStore.DeleteNewsletterMessages(jidStr)
 	}
 
-	results := make([]NewsletterMessageInfo, 0, len(msgs))
-	for _, msg := range msgs {
-		results = append(results, convertNewsletterMessage(msg))
+	for {
+		params := &whatsmeow.GetNewsletterMessagesParams{Count: pageSize}
+		if cursor > 0 {
+			params.Before = types.MessageServerID(cursor)
+		}
+
+		msgs, err := s.client.GetNewsletterMessages(ctx, jid, params)
+		if err != nil {
+			if totalFetched > 0 {
+				s.logger.Warnf("Stopped fetching newsletter %s after %d messages: %v", jidStr, totalFetched, err)
+				return nil
+			}
+			return fmt.Errorf("failed to get newsletter messages: %w", err)
+		}
+		if len(msgs) == 0 {
+			break
+		}
+
+		batch := make([]NewsletterMessageInfo, 0, len(msgs))
+		for _, msg := range msgs {
+			converted := convertNewsletterMessage(msg)
+			batch = append(batch, converted)
+			s.cacheNewsletterMediaMessage(jid, msg, &converted)
+		}
+
+		if s.historyStore != nil {
+			s.historyStore.StoreNewsletterMessages(jidStr, batch)
+		}
+
+		totalFetched += len(msgs)
+		cursor = int(msgs[len(msgs)-1].MessageServerID)
+
+		if len(msgs) < pageSize {
+			break
+		}
+
+		time.Sleep(time.Duration(delayMs) * time.Millisecond)
 	}
 
-	return results, nil
+	s.logger.Infof("Fetched and cached %d messages from newsletter %s", totalFetched, jidStr)
+	return nil
+}
+
+// cacheNewsletterMediaMessage caches a newsletter message with media for later download via the "media" RPC.
+// Newsletter media is unencrypted (no MediaKey) -- whatsmeow Download() handles this transparently.
+func (s *Service) cacheNewsletterMediaMessage(jid types.JID, msg *types.NewsletterMessage, converted *NewsletterMessageInfo) {
+	if converted.MediaType == "" || msg.Message == nil {
+		return
+	}
+
+	syntheticMsg := &events.Message{
+		Info: types.MessageInfo{
+			MessageSource: types.MessageSource{Chat: jid},
+			ID:            msg.MessageID,
+			Timestamp:     msg.Timestamp,
+		},
+		Message: msg.Message,
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.messages[converted.MessageID]; !exists {
+		maxMessages := s.newsletterConfig.MediaCacheSize
+		for len(s.messageOrder) >= maxMessages {
+			oldestID := s.messageOrder[0]
+			s.messageOrder = s.messageOrder[1:]
+			delete(s.messages, oldestID)
+		}
+		s.messages[converted.MessageID] = syntheticMsg
+		s.messageOrder = append(s.messageOrder, converted.MessageID)
+	}
 }
 
 // SendNewsletterMessage sends a message to a newsletter channel (admin only)
