@@ -23,7 +23,8 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
-	_ "modernc.org/sqlite"
+	_ "github.com/ncruces/go-sqlite3/driver"
+	_ "github.com/ncruces/go-sqlite3/embed"
 
 	"whatsapp-rpc/src/go/config"
 )
@@ -79,7 +80,7 @@ func NewService(cfg *config.Config, logger *logrus.Logger) (*Service, error) {
 	dbLog := waLog.Stdout("Database", "INFO", true)
 	ctx := context.Background()
 	// Increased busy timeout to 30 seconds and added cache=shared for better concurrency on Windows
-	container, err := sqlstore.New(ctx, "sqlite", "file:"+dbConfig.Path+"?_pragma=foreign_keys(1)&_journal_mode=WAL&_busy_timeout=30000&cache=shared", dbLog)
+	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbConfig.Path+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=30000&cache=shared", dbLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}

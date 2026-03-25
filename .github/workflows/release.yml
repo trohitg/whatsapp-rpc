@@ -32,6 +32,18 @@ jobs:
           - os: windows-latest
             goos: windows
             goarch: amd64
+          # Android targets
+          - os: ubuntu-latest
+            goos: android
+            goarch: arm64
+            output_name: libwhatsapp-rpc-android-arm64.so
+            artifact_name: libwhatsapp-rpc-android-arm64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            output_name: libwhatsapp-rpc-android-x86_64.so
+            artifact_name: libwhatsapp-rpc-android-x86_64
+            is_android_emu: true
 
     runs-on: ${{ matrix.os }}
 
@@ -52,12 +64,15 @@ jobs:
           CGO_ENABLED: 0
         shell: bash
         run: |
-          ext=""
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            ext=".exe"
+          if [ -n "${{ matrix.output_name }}" ]; then
+            output_name="${{ matrix.output_name }}"
+          else
+            ext=""
+            if [ "${{ matrix.goos }}" = "windows" ]; then
+              ext=".exe"
+            fi
+            output_name="whatsapp-rpc-server-${{ matrix.goos }}-${{ matrix.goarch }}${ext}"
           fi
-
-          output_name="whatsapp-rpc-server-${{ matrix.goos }}-${{ matrix.goarch }}${ext}"
 
           echo "Building ${output_name}..."
           go build -ldflags="-s -w" -o "${output_name}" ./src/go/cmd/server
@@ -68,8 +83,10 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: whatsapp-rpc-server-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: whatsapp-rpc-server-*
+          name: ${{ matrix.artifact_name || format('whatsapp-rpc-server-{0}-{1}', matrix.goos, matrix.goarch) }}
+          path: |
+            whatsapp-rpc-server-*
+            libwhatsapp-rpc-*
           retention-days: 1
 
   # Step 2: Create GitHub Release with binaries attached
@@ -87,7 +104,7 @@ jobs:
       - name: List artifacts
         run: |
           echo "Downloaded artifacts:"
-          find artifacts -type f -name "whatsapp-rpc-server-*" | head -20
+          find artifacts -type f \( -name "whatsapp-rpc-server-*" -o -name "libwhatsapp-rpc-*" \) | head -20
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -95,6 +112,7 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/**/whatsapp-rpc-server-*
+            artifacts/**/libwhatsapp-rpc-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

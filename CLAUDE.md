@@ -138,6 +138,39 @@ newsletter:
 | `web/app.py` | Flask routes, Socket.IO |
 | `scripts/cli.js` | CLI for all commands (start/stop/build/clean) |
 
+## Cross-Platform / Android
+
+### SQLite Driver
+Uses `ncruces/go-sqlite3` (WASM via wazero) -- works on all platforms including Android. **Must import both packages:**
+```go
+_ "github.com/ncruces/go-sqlite3/driver"  // registers "sqlite3" driver
+_ "github.com/ncruces/go-sqlite3/embed"   // embeds SQLite WASM binary
+```
+Dialect is `"sqlite3"` (not `"sqlite"`). Do NOT use `modernc.org/sqlite` -- it crashes on Android.
+
+### Build Targets
+```bash
+npm run build-cross  # All 7 targets
+```
+
+| Target | GOOS | GOARCH | Output |
+|--------|------|--------|--------|
+| Linux x64 | linux | amd64 | `whatsapp-rpc-server-linux-amd64` |
+| Linux arm64 | linux | arm64 | `whatsapp-rpc-server-linux-arm64` |
+| macOS x64 | darwin | amd64 | `whatsapp-rpc-server-darwin-amd64` |
+| macOS arm64 | darwin | arm64 | `whatsapp-rpc-server-darwin-arm64` |
+| Windows x64 | windows | amd64 | `whatsapp-rpc-server-windows-amd64.exe` |
+| Android arm64 | android | arm64 | `libwhatsapp-rpc-android-arm64.so` |
+| Android x86_64 | linux | amd64 | `libwhatsapp-rpc-android-x86_64.so` |
+
+Android emulator uses `GOOS=linux` (not `android`) because `android/amd64` requires CGO.
+
+### Android Integration
+- Binary must be named `lib*.so` and placed in `jniLibs/{abi}/` for SELinux execute permission
+- Set env var `SSL_CERT_DIR=/system/etc/security/cacerts` when launching
+- Set env var `WHATSAPP_RPC_ANDROID=1` to activate Android DNS resolver (for emulator builds)
+- Gradle: `useLegacyPackaging = true` and `abiFilters += listOf("x86_64", "arm64-v8a")`
+
 ## Guidelines
 
 - WebSocket only - no REST endpoints

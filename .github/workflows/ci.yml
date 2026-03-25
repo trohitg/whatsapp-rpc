@@ -29,6 +29,16 @@ jobs:
           - os: windows-latest
             goos: windows
             goarch: amd64
+          # Android targets
+          - os: ubuntu-latest
+            goos: android
+            goarch: arm64
+            output_name: libwhatsapp-rpc-android-arm64.so
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            output_name: libwhatsapp-rpc-android-x86_64.so
+            is_android_emu: true
 
     runs-on: ${{ matrix.os }}
 
@@ -49,11 +59,15 @@ jobs:
           CGO_ENABLED: 0
         shell: bash
         run: |
-          ext=""
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            ext=".exe"
+          if [ -n "${{ matrix.output_name }}" ]; then
+            output_name="${{ matrix.output_name }}"
+          else
+            ext=""
+            if [ "${{ matrix.goos }}" = "windows" ]; then
+              ext=".exe"
+            fi
+            output_name="whatsapp-rpc-server-${{ matrix.goos }}-${{ matrix.goarch }}${ext}"
           fi
-          output_name="whatsapp-rpc-server-${{ matrix.goos }}-${{ matrix.goarch }}${ext}"
           echo "Building ${output_name}..."
           go build -ldflags="-s -w" -o "${output_name}" ./src/go/cmd/server
           ls -la "${output_name}"

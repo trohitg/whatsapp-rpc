@@ -461,6 +461,48 @@ asyncio.run(main())
 
 See [src/python/README.md](src/python/README.md) for full Python client documentation.
 
+## Android Integration
+
+Cross-compile the server for Android and embed it in your app:
+
+```bash
+# Build for all platforms including Android
+npm run build-cross
+
+# Or manually:
+# arm64 real device
+CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -ldflags="-s -w" -o libwhatsapp-rpc.so ./src/go/cmd/server
+
+# x86_64 emulator (use GOOS=linux, not android)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o libwhatsapp-rpc-x86_64.so ./src/go/cmd/server
+```
+
+Place binaries in your Android project:
+```
+app/android/app/src/main/jniLibs/
+    arm64-v8a/libwhatsapp-rpc.so
+    x86_64/libwhatsapp-rpc-x86_64.so
+```
+
+Required Gradle config (`build.gradle.kts`):
+```kotlin
+android {
+    packaging { jniLibs { useLegacyPackaging = true } }
+    defaultConfig { ndk { abiFilters += listOf("x86_64", "arm64-v8a") } }
+}
+```
+
+Launch from Kotlin:
+```kotlin
+val binary = File(applicationInfo.nativeLibraryDir, "libwhatsapp-rpc.so")
+val pb = ProcessBuilder(binary.absolutePath)
+pb.environment()["SSL_CERT_DIR"] = "/system/etc/security/cacerts"
+pb.environment()["WHATSAPP_RPC_ANDROID"] = "1"  // enables Android DNS resolver
+pb.start()
+```
+
+Then connect via WebSocket at `ws://127.0.0.1:9400/ws/rpc`.
+
 ## Requirements
 
 - Node.js 18+
@@ -468,6 +510,7 @@ See [src/python/README.md](src/python/README.md) for full Python client document
   - Linux (amd64, arm64)
   - macOS (amd64, arm64)
   - Windows (amd64)
+  - Android (arm64, x86_64)
 
 ## License
 

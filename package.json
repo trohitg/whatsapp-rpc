@@ -46,6 +46,7 @@
     "web": "node scripts/cli.js web",
     "prebuild": "node -e \"require('fs').existsSync('node_modules') || process.exit(1)\" || npm install",
     "build": "node scripts/cli.js build",
+    "build-cross": "node scripts/cli.js build-cross",
     "preclean": "node -e \"require('fs').existsSync('node_modules') || process.exit(1)\" || npm install",
     "clean": "node scripts/cli.js clean"
   },

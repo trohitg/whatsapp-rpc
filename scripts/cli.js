@@ -162,6 +162,39 @@ async function clean(opts = {}) {
   log('Clean complete', 'green');
 }
 
+const CROSS_TARGETS = [
+  { goos: 'linux',   goarch: 'amd64', output: 'whatsapp-rpc-server-linux-amd64' },
+  { goos: 'linux',   goarch: 'arm64', output: 'whatsapp-rpc-server-linux-arm64' },
+  { goos: 'darwin',  goarch: 'amd64', output: 'whatsapp-rpc-server-darwin-amd64' },
+  { goos: 'darwin',  goarch: 'arm64', output: 'whatsapp-rpc-server-darwin-arm64' },
+  { goos: 'windows', goarch: 'amd64', output: 'whatsapp-rpc-server-windows-amd64.exe' },
+  { goos: 'android', goarch: 'arm64', output: 'libwhatsapp-rpc-android-arm64.so' },
+  { goos: 'linux',   goarch: 'amd64', output: 'libwhatsapp-rpc-android-x86_64.so', label: 'android-x86_64' },
+];
+
+async function buildCross() {
+  if (!hasGo()) {
+    log('Go is not installed. Install from: https://go.dev/dl/', 'red');
+    process.exit(1);
+  }
+  if (!existsSync(BIN_DIR)) {
+    mkdirSync(BIN_DIR, { recursive: true });
+  }
+
+  for (const target of CROSS_TARGETS) {
+    const label = target.label || `${target.goos}/${target.goarch}`;
+    const out = join(BIN_DIR, target.output);
+    log(`Building ${label} -> ${target.output}`, 'blue');
+    await execa('go', ['build', '-ldflags=-s -w', '-o', out, './src/go/cmd/server'], {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: { ...process.env, GOOS: target.goos, GOARCH: target.goarch, CGO_ENABLED: '0' },
+    });
+    log(`  ${target.output} (${(statSync(out).size / 1024 / 1024).toFixed(1)}MB)`, 'green');
+  }
+  log(`All ${CROSS_TARGETS.length} binaries built`, 'green');
+}
+
 // Global port option for all commands
 const portOption = ['-p, --port <port>', 'API port (default: 9400, or PORT/WHATSAPP_RPC_PORT env var)'];
 
@@ -172,5 +205,6 @@ program.command('restart').description('Restart API server').option(...portOptio
 program.command('status').description('Show server status').option(...portOption).action(status);
 program.command('api').description('Start API server').option('-f, --foreground', 'Run in foreground').option(...portOption).action(api);
 program.command('build').description('Build binary from source (requires Go)').action(build);
+program.command('build-cross').description('Cross-compile binaries for all platforms (desktop + Android)').action(buildCross);
 program.command('clean').description('Full cleanup (stop server, remove bin/, data/, node_modules/)').action(clean);
 program.parse();

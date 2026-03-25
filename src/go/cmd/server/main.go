@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -17,6 +19,23 @@ import (
 )
 
 func main() {
+	// Android DNS resolver: Go's default resolver tries [::1]:53 which fails on Android.
+	// Activated by GOOS=android or WHATSAPP_RPC_ANDROID=1 env var (for emulator builds).
+	if runtime.GOOS == "android" || os.Getenv("WHATSAPP_RPC_ANDROID") == "1" {
+		net.DefaultResolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{}
+				for _, dns := range []string{"10.0.2.3:53", "8.8.8.8:53"} {
+					if conn, err := d.DialContext(ctx, "udp", dns); err == nil {
+						return conn, nil
+					}
+				}
+				return d.DialContext(ctx, network, address)
+			},
+		}
+	}
+
 	// Initialize logger
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.TextFormatter{
