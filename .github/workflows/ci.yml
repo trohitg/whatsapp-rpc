@@ -89,24 +89,15 @@ jobs:
         run: |
           NPM_VERSION=$(node -p "require('./package.json').version")
           PYPI_VERSION=$(grep '^version = ' src/python/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-          INIT_VERSION=$(grep '__version__' src/python/whatsapp_rpc/__init__.py | sed 's/__version__ = "\(.*\)"/\1/')
 
           echo "npm version:    $NPM_VERSION"
           echo "pypi version:   $PYPI_VERSION"
-          echo "init version:   $INIT_VERSION"
 
-          MISMATCH=0
           if [ "$NPM_VERSION" != "$PYPI_VERSION" ]; then
-            echo "::warning::Version mismatch: package.json ($NPM_VERSION) != pyproject.toml ($PYPI_VERSION)"
-            MISMATCH=1
-          fi
-          if [ "$PYPI_VERSION" != "$INIT_VERSION" ]; then
-            echo "::error::Version mismatch: pyproject.toml ($PYPI_VERSION) != __init__.py ($INIT_VERSION)"
+            echo "::error::Version mismatch: package.json ($NPM_VERSION) != pyproject.toml ($PYPI_VERSION)"
             exit 1
           fi
-          if [ "$MISMATCH" = "0" ]; then
-            echo "All versions match: $NPM_VERSION"
-          fi
+          echo "All versions match: $NPM_VERSION"
 
   # Validate npm package
   build-npm:

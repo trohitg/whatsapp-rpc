@@ -38,6 +38,7 @@ web/
 npm start         # Start API + Web (auto-installs deps if needed)
 npm stop          # Stop all
 npm run build     # Build Go binary (auto-installs deps if needed)
+npm run build-cross  # Cross-compile all 7 platform targets
 npm run clean     # Full cleanup (stops processes, removes bin/, data/*.db, node_modules/)
 npm run status    # Check status
 npm run api       # Start API only
@@ -170,6 +171,14 @@ Android emulator uses `GOOS=linux` (not `android`) because `android/amd64` requi
 - Set env var `SSL_CERT_DIR=/system/etc/security/cacerts` when launching
 - Set env var `WHATSAPP_RPC_ANDROID=1` to activate Android DNS resolver (for emulator builds)
 - Gradle: `useLegacyPackaging = true` and `abiFilters += listOf("x86_64", "arm64-v8a")`
+
+## Versioning
+
+Two files must stay in sync:
+- `package.json` - npm version
+- `src/python/pyproject.toml` - PyPI version
+
+`__init__.py` reads the version dynamically via `importlib.metadata`. CI enforces this via the `check-versions` job. The release workflow auto-syncs from the git tag, but local development versions must match.
 
 ## Guidelines
 

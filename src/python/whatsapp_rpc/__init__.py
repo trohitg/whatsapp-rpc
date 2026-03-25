@@ -1,4 +1,6 @@
+from importlib.metadata import version
+
 from .client import WhatsAppRPCClient
 
-__version__ = "0.0.13"
+__version__ = version("whatsapp-rpc")
 __all__ = ["WhatsAppRPCClient"]
