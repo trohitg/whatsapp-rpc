@@ -5,13 +5,13 @@
   "description": "EdgyMeow - WhatsApp WebSocket RPC Server with JSON-RPC 2.0 protocol",
   "author": "Rohit G <trohitg@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/trohitg/whatsapp-rpc#readme",
+  "homepage": "https://github.com/trohitg/edgymeow#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/trohitg/whatsapp-rpc.git"
+    "url": "git+https://github.com/trohitg/edgymeow.git"
   },
   "bugs": {
-    "url": "https://github.com/trohitg/whatsapp-rpc/issues"
+    "url": "https://github.com/trohitg/edgymeow/issues"
   },
   "keywords": [
     "whatsapp",

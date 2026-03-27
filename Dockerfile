@@ -14,7 +14,7 @@ RUN go mod download
 COPY src/go/ ./src/go/
 
 # Build binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o whatsapp-rpc-server ./src/go/cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o edgymeow-server ./src/go/cmd/server
 
 # Runtime stage
 FROM alpine:latest
@@ -28,7 +28,7 @@ RUN apk add --no-cache ca-certificates tzdata
 RUN mkdir -p /app/data/qr /app/configs
 
 # Copy binary from builder
-COPY --from=builder /app/whatsapp-rpc-server .
+COPY --from=builder /app/edgymeow-server .
 
 # Copy config if exists
 COPY configs/config.yaml ./configs/
@@ -41,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:9400/health || exit 1
 
 # Run server
-CMD ["./whatsapp-rpc-server"]
+CMD ["./edgymeow-server"]

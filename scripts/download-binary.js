@@ -22,7 +22,7 @@ const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf-8'));
 const VERSION = pkg.version;
 
 // GitHub release URL
-const GITHUB_REPO = 'trohitg/whatsapp-rpc';
+const GITHUB_REPO = 'trohitg/edgymeow';
 const BASE_URL = `https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}`;
 
 // Platform detection
