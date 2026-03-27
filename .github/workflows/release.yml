@@ -216,14 +216,6 @@ jobs:
       - name: Install build tools
         run: pip install build twine
 
-      - name: Sync version from git tag
-        working-directory: src/python
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
-          echo "Set version to $VERSION"
-          grep "^version" pyproject.toml
-
       - name: Build package
         working-directory: src/python
         run: python -m build

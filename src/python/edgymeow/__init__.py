@@ -1,6 +1,9 @@
-from importlib.metadata import version
+try:
+    from ._version import __version__
+except ImportError:
+    from importlib.metadata import version
+    __version__ = version("edgymeow")
 
 from .client import WhatsAppRPCClient
 
-__version__ = version("edgymeow")
 __all__ = ["WhatsAppRPCClient"]

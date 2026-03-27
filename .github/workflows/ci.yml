@@ -76,29 +76,6 @@ jobs:
         if: (matrix.goos == 'linux' && matrix.goarch == 'amd64') || (matrix.goos == 'windows' && matrix.goarch == 'amd64')
         run: go test -v ./src/go/...
 
-  # Check version consistency across all package files
-  check-versions:
-    name: Check Version Consistency
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Verify versions match
-        run: |
-          NPM_VERSION=$(node -p "require('./package.json').version")
-          PYPI_VERSION=$(grep '^version = ' src/python/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-
-          echo "npm version:    $NPM_VERSION"
-          echo "pypi version:   $PYPI_VERSION"
-
-          if [ "$NPM_VERSION" != "$PYPI_VERSION" ]; then
-            echo "::error::Version mismatch: package.json ($NPM_VERSION) != pyproject.toml ($PYPI_VERSION)"
-            exit 1
-          fi
-          echo "All versions match: $NPM_VERSION"
-
   # Validate npm package
   build-npm:
     name: Build npm

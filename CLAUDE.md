@@ -193,11 +193,9 @@ Android emulator uses `GOOS=linux` (not `android`) because `android/amd64` requi
 
 ## Versioning
 
-Two files must stay in sync:
-- `package.json` - npm version
-- `src/python/pyproject.toml` - PyPI version
-
-`__init__.py` reads the version dynamically via `importlib.metadata`. CI enforces this via the `check-versions` job. The release workflow auto-syncs from the git tag, but local development versions must match.
+- `package.json` - npm version (single source of truth for local dev)
+- Python version is derived dynamically from git tags via `setuptools-scm` (no hardcoded version in `pyproject.toml`)
+- Release workflow syncs both npm and PyPI versions from the git tag automatically
 
 ## Guidelines
 
