@@ -1,4 +1,4 @@
-package com.crossmeow.app
+package com.edgymeow.app
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -7,7 +7,7 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val CHANNEL = "com.crossmeow/backend"
+        private const val CHANNEL = "com.edgymeow/backend"
         private const val DEFAULT_PORT = 9400
     }
 

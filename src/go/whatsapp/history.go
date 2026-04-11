@@ -45,6 +45,9 @@ func NewHistoryStore(dbPath string, logger *logrus.Logger) (*HistoryStore, error
 		return nil, err
 	}
 
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
 	store := &HistoryStore{db: db, logger: logger}
 	if err := store.initTable(); err != nil {
 		return nil, err

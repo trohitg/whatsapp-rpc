@@ -41,7 +41,7 @@ web/
     contacts.html          # Contacts
     settings.html          # Settings & rate limiting
 examples/
-  android/                 # CrossMeow Flutter app (WebView + Go binary)
+  android/                 # CrossMeow Flutter app (native UI + Go binary)
 ```
 
 ## Commands
@@ -156,7 +156,7 @@ newsletter:
 | `web/client/js/app.js` | Shared nav, status indicator, RPC init |
 | `scripts/cli.js` | CLI for all commands (start/stop/build/clean/web/dev) |
 | `scripts/serve-client.js` | Node.js static file server for web/client/ |
-| `examples/android/` | CrossMeow Flutter app (WebView + embedded Go binary) |
+| `examples/android/` | CrossMeow Flutter app (native UI + embedded Go binary) |
 
 ## Cross-Platform / Android
 

@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
-import 'web_server.dart';
+import 'app_state.dart';
+import 'dashboard_tab.dart';
+import 'messages_tab.dart';
+import 'send_tab.dart';
 
 const _defaultPort = 9400;
-const _channel = MethodChannel('com.crossmeow/backend');
+const _channel = MethodChannel('com.edgymeow/backend');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const CrossMeowApp());
+  runApp(const EdgyMeowApp());
 }
 
-class CrossMeowApp extends StatelessWidget {
-  const CrossMeowApp({super.key});
+class EdgyMeowApp extends StatelessWidget {
+  const EdgyMeowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CrossMeow',
+      title: 'EdgyMeow',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.teal,
@@ -41,10 +43,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _status = 'Starting backend...';
-  WebServer? _webServer;
-  WebViewController? _webViewController;
+  AppState? _appState;
   bool _ready = false;
-  int _backendPort = _defaultPort;
+  int _currentTab = 0;
 
   @override
   void initState() {
@@ -55,48 +56,34 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     WakelockPlus.disable();
-    _webServer?.stop();
+    _appState?.dispose();
     _stopBackend();
     super.dispose();
   }
 
   Future<void> _init() async {
     try {
-      // 1. Start Go backend
       setState(() => _status = 'Starting backend...');
-      final result = await _channel.invokeMethod<Map>('startBackend', {'port': _backendPort});
+      int port = _defaultPort;
+      final result =
+          await _channel.invokeMethod<Map>('startBackend', {'port': port});
       if (result != null && result['port'] != null) {
-        _backendPort = result['port'] as int;
+        port = result['port'] as int;
       }
 
-      // Wait for backend to be ready
       await Future.delayed(const Duration(seconds: 3));
 
-      // 2. Start Dart web server serving static assets
-      setState(() => _status = 'Starting web server...');
-      _webServer = WebServer(_backendPort);
-      await _webServer!.start();
-
-      // 3. Enable wakelock
       WakelockPlus.enable();
 
-      // 4. Create WebView controller
-      final controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(NavigationDelegate(
-          onPageStarted: (_) => setState(() => _status = 'Loading...'),
-          onPageFinished: (_) => setState(() {
-            _status = 'Ready';
-            _ready = true;
-          }),
-          onWebResourceError: (error) {
-            setState(() => _status = 'Error: ${error.description}');
-          },
-        ))
-        ..loadRequest(Uri.parse('http://127.0.0.1:${_webServer!.port}/'));
+      final appState = AppState();
+      appState.addListener(() {
+        if (mounted) setState(() {});
+      });
+      appState.init(port);
 
       setState(() {
-        _webViewController = controller;
+        _appState = appState;
+        _ready = true;
       });
     } on PlatformException catch (e) {
       setState(() => _status = 'Backend failed: ${e.message}');
@@ -113,7 +100,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_webViewController == null) {
+    if (!_ready || _appState == null) {
       return Scaffold(
         backgroundColor: Colors.grey.shade900,
         body: Center(
@@ -129,10 +116,97 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    final appState = _appState!;
+
     return Scaffold(
-      body: SafeArea(
-        child: WebViewWidget(controller: _webViewController!),
+      appBar: AppBar(
+        title: const Text('EdgyMeow'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _statusColor(appState),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _statusLabel(appState),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      body: _buildTab(appState),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentTab,
+        onDestinationSelected: (index) {
+          setState(() => _currentTab = index);
+          if (index == 2) appState.clearUnread();
+        },
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.send),
+            label: 'Send',
+          ),
+          NavigationDestination(
+            icon: appState.unreadCount > 0
+                ? Badge(
+                    label: Text('${appState.unreadCount}'),
+                    child: const Icon(Icons.message),
+                  )
+                : const Icon(Icons.message),
+            label: 'Messages',
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildTab(AppState appState) {
+    switch (_currentTab) {
+      case 1:
+        return SendTab(appState: appState);
+      case 2:
+        return MessagesTab(appState: appState);
+      default:
+        return DashboardTab(appState: appState);
+    }
+  }
+
+  Color _statusColor(AppState appState) {
+    if (appState.connectionState == 'connected' && appState.waConnected) {
+      return Colors.green;
+    }
+    if (appState.connectionState == 'connecting' ||
+        (appState.connectionState == 'connected' && !appState.waConnected)) {
+      return Colors.amber;
+    }
+    return Colors.red;
+  }
+
+  String _statusLabel(AppState appState) {
+    if (appState.connectionState == 'connected' && appState.waConnected) {
+      return 'Connected';
+    }
+    if (appState.connectionState == 'connected' && appState.waHasSession) {
+      return 'Connecting';
+    }
+    if (appState.connectionState == 'connecting') {
+      return 'Connecting...';
+    }
+    return 'Offline';
   }
 }

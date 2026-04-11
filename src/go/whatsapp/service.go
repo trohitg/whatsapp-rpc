@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -79,9 +80,14 @@ func NewService(cfg *config.Config, logger *logrus.Logger) (*Service, error) {
 	// Setup database with WAL mode for concurrent access and extended busy timeout
 	dbLog := waLog.Stdout("Database", "INFO", true)
 	ctx := context.Background()
-	// Increased busy timeout to 30 seconds and added cache=shared for better concurrency on Windows
-	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbConfig.Path+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=30000&cache=shared", dbLog)
+	db, err := sql.Open("sqlite3", "file:"+dbConfig.Path+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=30000&cache=shared")
 	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	container := sqlstore.NewWithDB(db, "sqlite3", dbLog)
+	if err := container.Upgrade(ctx); err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
@@ -2245,8 +2251,14 @@ func (s *Service) reinitClient() error {
 	// Create new database
 	dbLog := waLog.Stdout("Database", "INFO", true)
 	ctx := context.Background()
-	container, err := sqlstore.New(ctx, "sqlite", "file:"+s.dbPath+"?_pragma=foreign_keys(1)&_journal_mode=WAL&_busy_timeout=30000&cache=shared", dbLog)
+	db, err := sql.Open("sqlite3", "file:"+s.dbPath+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=30000&cache=shared")
 	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	container := sqlstore.NewWithDB(db, "sqlite3", dbLog)
+	if err := container.Upgrade(ctx); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 

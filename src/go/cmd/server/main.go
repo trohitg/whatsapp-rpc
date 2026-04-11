@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,15 +20,44 @@ import (
 	"edgymeow/src/go/whatsapp"
 )
 
+// discoverDNSServers reads nameservers from /etc/resolv.conf and returns them as host:53 pairs.
+func discoverDNSServers() []string {
+	var servers []string
+	f, err := os.Open("/etc/resolv.conf")
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "nameserver") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				ip := fields[1]
+				// Skip loopback — Go's default already tried that and failed
+				if ip == "::1" || ip == "127.0.0.1" {
+					continue
+				}
+				servers = append(servers, net.JoinHostPort(ip, "53"))
+			}
+		}
+	}
+	return servers
+}
+
 func main() {
 	// Android DNS resolver: Go's default resolver tries [::1]:53 which fails on Android.
-	// Activated by GOOS=android or EDGYMEOW_ANDROID=1 env var (for emulator builds).
+	// Dynamically discover DNS servers from resolv.conf, fall back to public DNS.
 	if runtime.GOOS == "android" || os.Getenv("EDGYMEOW_ANDROID") == "1" {
+		dnsServers := discoverDNSServers()
+		// Append public DNS as fallback
+		dnsServers = append(dnsServers, "8.8.8.8:53", "1.1.1.1:53")
 		net.DefaultResolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				d := net.Dialer{}
-				for _, dns := range []string{"10.0.2.3:53", "8.8.8.8:53"} {
+				d := net.Dialer{Timeout: 3 * time.Second}
+				for _, dns := range dnsServers {
 					if conn, err := d.DialContext(ctx, "udp", dns); err == nil {
 						return conn, nil
 					}
@@ -76,7 +107,7 @@ func main() {
 	router := srv.SetupRoutes()
 
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
+		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler: router,
 	}
 
