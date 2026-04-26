@@ -191,7 +191,7 @@ func (s *Service) Start() error {
 	s.shutdown = false
 	s.running = true
 
-	s.logger.Info("Starting WhatsApp service...")
+	s.logger.Infof("Starting WhatsApp service [WA web version: %s]", store.GetWAVersion())
 
 	// Simple flow like working example
 	if s.client.Store.ID == nil {
@@ -344,12 +344,32 @@ func (s *Service) eventHandler(evt interface{}) {
 			Time: time.Now(),
 		})
 	case *events.ConnectFailure:
-		s.logger.Errorf("Connection failure: %+v", v)
+		if v.Reason == events.ConnectFailureClientOutdated {
+			s.logger.Errorf("FATAL: WhatsApp rejected handshake with 405 Client Outdated. "+
+				"Bundled WA web version: %s. Update whatsmeow (go get -u go.mau.fi/whatsmeow@latest) "+
+				"and rebuild the binary.", store.GetWAVersion())
+		} else {
+			s.logger.Errorf("Connection failure: reason=%d (%s) message=%q full=%+v",
+				v.Reason, v.Reason.String(), v.Message, v)
+		}
 		s.safeEventSend(Event{
 			Type: "connection_failure",
 			Data: map[string]interface{}{
-				"error": fmt.Sprintf("%+v", v),
-				"reason": v.Reason.String(),
+				"error":      fmt.Sprintf("%+v", v),
+				"reason":     v.Reason.String(),
+				"reason_code": int(v.Reason),
+				"wa_version": store.GetWAVersion().String(),
+			},
+			Time: time.Now(),
+		})
+	case *events.ClientOutdated:
+		s.logger.Errorf("FATAL: WhatsApp marked client as outdated. Bundled WA web version: %s. "+
+			"Update whatsmeow (go get -u go.mau.fi/whatsmeow@latest) and rebuild the binary.",
+			store.GetWAVersion())
+		s.safeEventSend(Event{
+			Type: "client_outdated",
+			Data: map[string]interface{}{
+				"wa_version": store.GetWAVersion().String(),
 			},
 			Time: time.Now(),
 		})

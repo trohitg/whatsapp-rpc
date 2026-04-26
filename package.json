@@ -1,6 +1,6 @@
 {
   "name": "edgymeow",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "type": "module",
   "description": "EdgyMeow - WhatsApp WebSocket RPC Server with JSON-RPC 2.0 protocol",
   "author": "Rohit G <trohitg@gmail.com>",
